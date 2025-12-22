@@ -8,13 +8,13 @@ This script could also be executed as a raw Python project. Make sure Python 3.8
 installed. First switch to a target directory and download the source code:
 
 ```shell script
-git clone https://github.com/cmplab-cimr/2025_neurodegenerative_metabolism
+git clone https://github.com/cmplab-cimr/20251222_Zesheng_Xuanwu_brain
 ```
 
 Switch to the source direct, add PYTHONPATH environment and run the `main.py`:
 
 ```shell script
-cd 2025_neurodegenerative_metabolism
+cd 20251222_Zesheng_Xuanwu_brain
 export PYTHONPATH=$PYTHONPATH:`pwd`
 python main.py
 ```
