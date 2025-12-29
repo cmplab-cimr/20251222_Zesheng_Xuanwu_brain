@@ -100,22 +100,23 @@ ser_gly_reaction_list = [
         'sub': [('3PG_c', 'abc')],
         'pro': [('SER_c', 'abc')],
     },
+    # {
+    #     'id': 'SHMT_c',
+    #     'sub': [('SER_c', 'abc')],
+    #     'pro': [('GLY_c', 'ab'), ('1CTHF_c', 'c')],
+    #     'reverse': True
+    # },
     {
-        'id': 'SHMT_c',
-        'sub': [('SER_c', 'abc')],
-        'pro': [('GLY_c', 'ab'), ('1CTHF_c', 'c')],
-        'reverse': True
-    },
-    {
-        'id': 'SER_input',
+        'id': 'SER_exchange',
         'sub': [('SER_e', 'abc')],
         'pro': [('SER_c', 'abc')],
+        'reverse': True
     },
-    {
-        'id': 'GLY_input',
-        'sub': [('GLY_e', 'ab')],
-        'pro': [('GLY_c', 'ab')],
-    },
+    # {
+    #     'id': 'GLY_input',
+    #     'sub': [('GLY_e', 'ab')],
+    #     'pro': [('GLY_c', 'ab')],
+    # },
 ]
 
 tca_reaction_list = [
@@ -198,11 +199,11 @@ glu_reaction_list = [
         'pro': [('OAC_m', 'abcd'), ('GLU_m', 'efghi')],
         'reverse': True
     },
-    {
-        'id': 'AS_c',
-        'sub': [('ASP_c', 'abcd'), ('GLN_c', 'efghi')],
-        'pro': [('ASN_c', 'abcd'), ('GLU_c', 'efghi')],
-    },
+    # {
+    #     'id': 'AS_c',
+    #     'sub': [('ASP_c', 'abcd'), ('GLN_c', 'efghi')],
+    #     'pro': [('ASN_c', 'abcd'), ('GLU_c', 'efghi')],
+    # },
     {
         'id': 'ASPTA_c',
         'sub': [('ASP_c', 'abcd'), ('AKG_c', 'efghi')],
@@ -213,9 +214,10 @@ glu_reaction_list = [
 
 ala_reaction_list = [
     {
-        'id': 'ALA_input',
+        'id': 'ALA_exchange',
         'sub': [('ALA_e', 'abc')],
         'pro': [('ALA_c', 'abc')],
+        'reverse': True
     },
     {
         'id': 'GPT_c',
@@ -314,35 +316,121 @@ exchange_reaction_list = [
 
 intake_secret_reaction_list = [
     {
-        'id': 'GLC_input',
+        'id': 'GLC_exchange',
         'sub': [('GLC_e', 'abcdef')],
         'pro': [('GLC_c', 'abcdef')],
+        'reverse': True
     },
     {
-        'id': 'GLN_input',
-        'sub': [('GLN_e', 'abcde')],
-        'pro': [('GLN_c', 'abcde')],
-    },
-    {
-        'id': 'GLU_input',
+        'id': 'GLU_exchange',
         'sub': [('GLU_e', 'abcde')],
         'pro': [('GLU_c', 'abcde')],
+        'reverse': True
     },
     {
-        'id': 'ASP_input',
+        'id': 'GLN_exchange',
+        'sub': [('GLN_e', 'abcde')],
+        'pro': [('GLN_c', 'abcde')],
+        'reverse': True
+    },
+    {
+        'id': 'ASP_exchange',
         'sub': [('ASP_e', 'abcd')],
         'pro': [('ASP_c', 'abcd')],
+        'reverse': True
     },
     {
-        'id': 'LAC_output',
+        'id': 'PYR_exchange',
+        'sub': [('PYR_c', 'abc')],
+        'pro': [('PYR_e', 'abc')],
+        'reverse': True
+    },
+    {
+        'id': 'LAC_exchange',
         'sub': [('LAC_c', 'abc')],
         'pro': [('LAC_e', 'abc')],
+        'reverse': True
     },
 ]
 
 
+acetate_reaction_list = [
+    {
+        'id': 'PROS_m',
+        'sub': [('PYR_m', 'abc')],
+        'pro': [('ACE_m', 'bc'), ('CO2', 'a')],
+    },
+    {
+        'id': 'ACSS2_m',
+        'sub': [('ACE_m', 'ab')],
+        'pro': [('ACCOA_m', 'ab')],
+    },
+    {
+        'id': 'ACOT_c',
+        'sub': [('ACCOA_m', 'ab')],
+        'pro': [('ACE_m', 'ab')],
+    },
+    {
+        'id': 'ACE_trans',
+        'sub': [('ACE_m', 'ab')],
+        'pro': [('ACE_c', 'ab')],
+        'reverse': True
+    },
+    {
+        'id': 'ACE_exchange',
+        'sub': [('ACE_c', 'ab')],
+        'pro': [('ACE_e', 'ab')],
+        'reverse': True
+    },
+]
+
+
+glycerol_fatty_acid_reaction_list = [
+    {
+        'id': 'GK_c',
+        'sub': [('GLYCEROL_c', 'abc')],
+        'pro': [('G3P_c', 'abc')],
+    },
+    {
+        'id': 'G3PP_c',
+        'sub': [('G3P_c', 'abc')],
+        'pro': [('GLYCEROL_c', 'abc')],
+    },
+    {
+        'id': 'GPS_c',
+        'sub': [('G3P_c', 'abc')],
+        'pro': [('DHAP_c', 'abc')],
+        'reverse': True
+    },
+    {
+        'id': 'GLYCEROL_exchange',
+        'sub': [('GLYCEROL_c', 'abc')],
+        'pro': [('GLYCEROL_e', 'abc')],
+        'reverse': True
+    },
+    {
+        'id': 'FA_usage',
+        'sub': [('FA_c', 'ab')],
+        'pro': [('ACCOA_m', 'ab')],
+    },
+    {
+        'id': 'FA_exchange',
+        'sub': [('FA_c', 'ab')],
+        'pro': [('FA_e', 'ab')],
+        'reverse': True
+    },
+]
+
 biomass_reaction_list = biomass_reaction_dict_constructor([
-    'ALA_c', 'ASN_c', 'ASP_c', 'GLN_c', 'GLU_c', 'SER_c', 'GLY_c', 'RIB5P_c', 'ACCOA_lipid'
+    'ALA_c',
+    # 'ASN_c',
+    'ASP_c',
+    'GLN_c',
+    'GLU_c',
+    'SER_c',
+    # 'GLY_c',
+    'RIB5P_c',
+    'ACCOA_lipid'
 ])
 
 reaction_dict = {
@@ -354,6 +442,8 @@ reaction_dict = {
     'exchange_reaction': exchange_reaction_list,
     'intake_secret_reaction': intake_secret_reaction_list,
     'ala_reaction': ala_reaction_list,
+    'acetate_reaction': acetate_reaction_list,
+    'glycerol_fatty_acid_reaction': glycerol_fatty_acid_reaction_list,
     'biomass_reaction': biomass_reaction_list,
 }
 
@@ -362,15 +452,20 @@ for pathway_name, pathway_reaction_list in reaction_dict.items():
     reaction_list.extend(pathway_reaction_list)
 
 emu_excluded_metabolite_set = {
-    'CO2', 'BIOMASS', 'GLC_e', 'GLN_e', 'GLU_e', 'ASP_e', 'SER_e', 'GLY_e', 'ALA_e', 'LAC_e', 'ACCOA_lipid',
-    '1CTHF_c', 'RIB5P_stock'}
-
-symmetrical_metabolite_set = {'SUC_m', 'FUM_m'}
+    'CO2', 'BIOMASS', 'ACCOA_lipid', '1CTHF_c', 'RIB5P_stock'}
 
 balance_excluded_metabolite_set = emu_excluded_metabolite_set
 
-added_input_metabolite_set = {'GLC_e'}
+symmetrical_metabolite_set = {'SUC_m', 'FUM_m', 'GLYCEROL_c', 'GLYCEROL_e'}
 
 model_compartment_set = {'m', 'c', 'e'}
 
-composite_reaction_list = None
+composite_reaction_list = []
+
+from scripts.src.core.common.config import ModelKeyword
+other_pool_metabolite_dict = {
+    ModelKeyword.general: emu_excluded_metabolite_set,
+    ModelKeyword.serum: {
+        'GLC_e', 'GLU_e', 'GLN_e', 'ASP_e', 'SER_e', 'GLY_e', 'ALA_e', 'LAC_e', 'PYR_e',
+        'ACE_e', 'BHB_e', 'GLYCEROL_e', 'FA_e'}
+}

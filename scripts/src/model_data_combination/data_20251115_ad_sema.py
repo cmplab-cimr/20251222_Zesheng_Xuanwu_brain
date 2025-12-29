@@ -1,6 +1,7 @@
 from scripts.src.common.config import Color, Keywords, Direct
 from scripts.src.common.functions import data_param_list_generator_func_template, \
     collect_results_func_template
+from scripts.src.common.packages import it
 from scripts.src.io_functions.result_processing_functions import common_flux_comparison_func, \
     experimental_data_plotting_func_template, mid_name_list_generator_for_multiple_labeling_substrate
 
@@ -18,67 +19,44 @@ from scripts.src.mfa_analysis.mfa_config_generator import MFASettings
 
 average_str = 'average'
 
-data_name = DataSource.example_data_20250815
-model_name = ModelList.whole_body_infusion_model_dict
+data_name = DataSource.data_20251115_ad_sema
+model_name = ModelList.liver_cortex_compartmentalized_model
 data_content, keyword = common_data_loader(data_name, test_mode=False, natural_anti_correction=False)
 user_defined_model = model_loader(model_name)
 mfa_model_obj = common_model_constructor(user_defined_model)
-def return_data_content(running_mode, average=False, no_sucrose_2=True, sucrose_no_exercise=False, **kwargs):
+def return_data_content(running_mode, dataset_id=None, **kwargs):
     if running_mode == MFARunningMode.raw_experimental_data_plotting:
         return data_content
     else:
-        (
-            final_target_mfa_data_dict, experimental_result_information_dict_analysis,
-            experimental_tissue_mid_name_list_dict_constructor, final_result_information_dict,
-            *other_parameter
-        ) = data_content
-        if average:
-            reformatted_final_target_mfa_data_dict = {}
-            averaged_final_result_information_dict = {}
-            for new_result_label, each_result_label_mfa_data_obj in final_target_mfa_data_dict.items():
-                current_result_information_dict = final_result_information_dict[new_result_label]
-                labeling = current_result_information_dict[keyword.labeling]
-                condition = current_result_information_dict[keyword.condition]
-                exercise = current_result_information_dict[keyword.exercise]
-                index_num = current_result_information_dict[keyword.index]
-                if no_sucrose_2 and labeling == keyword.sucrose_2:
-                    continue
-                if sucrose_no_exercise and (labeling == keyword.sucrose and exercise == keyword.with_exec):
-                    continue
-                averaged_result_label = f'{labeling}__{condition}{'+' if exercise == keyword.with_exec else '-'}'
-                if averaged_result_label not in averaged_final_result_information_dict:
-                    reformatted_final_target_mfa_data_dict[averaged_result_label] = []
-                    new_result_information_dict = {
-                        keyword.labeling: labeling,
-                        keyword.condition: condition,
-                        keyword.exercise: exercise,
-                        keyword.index: average_str,
-                    }
-                    averaged_final_result_information_dict[averaged_result_label] = new_result_information_dict
-                current_reformatted_mfa_data_list = reformatted_final_target_mfa_data_dict[averaged_result_label]
-                while len(current_reformatted_mfa_data_list) < index_num:
-                    current_reformatted_mfa_data_list.append(None)
-                current_reformatted_mfa_data_list[index_num - 1] = each_result_label_mfa_data_obj
-            averaged_final_target_mfa_data_dict = {}
-            for averaged_result_label, mfa_obj_list in reformatted_final_target_mfa_data_dict.items():
-                averaged_final_target_mfa_data_dict[averaged_result_label] = average_multiple_mfa_data(
-                    mfa_obj_list, filter_excluded_from_mfa=True)
-            new_final_target_mfa_data_dict = averaged_final_target_mfa_data_dict
-            new_final_result_information_dict = averaged_final_result_information_dict
+        (mfa_data_dict, data_content_1, data_content_2, mfa_information_dict, data_content_4) = data_content
+        each_data_target_mfa_data_name_list_dict = {
+            'ctrl_vs_sema': [
+            ],
+        }
+        if dataset_id is None:
+            target_mfa_data_name_list = list(it.chain(*each_data_target_mfa_data_name_list_dict.values()))
         else:
-            new_final_target_mfa_data_dict = final_target_mfa_data_dict
-            new_final_result_information_dict = final_result_information_dict
-        new_data_content = (
-            new_final_target_mfa_data_dict, experimental_result_information_dict_analysis,
-            experimental_tissue_mid_name_list_dict_constructor, new_final_result_information_dict,
-            *other_parameter)
+            target_mfa_data_name_list = each_data_target_mfa_data_name_list_dict[dataset_id]
+        if len(target_mfa_data_name_list) == 0:
+            new_mfa_data_dict = mfa_data_dict
+            new_mfa_information_dict = mfa_information_dict
+        else:
+            new_mfa_data_dict = {
+                mfa_data_name: mfa_data_dict[mfa_data_name]
+                for mfa_data_name in target_mfa_data_name_list
+            }
+            new_mfa_information_dict = {
+                mfa_data_name: mfa_information_dict[mfa_data_name]
+                for mfa_data_name in target_mfa_data_name_list
+            }
+        new_data_content = (new_mfa_data_dict, data_content_1, data_content_2, new_mfa_information_dict, data_content_4)
         return new_data_content
 
 
 class UserDefinedMFASettings(MFASettings):
     loss_percentile = 0.005
     user_defined_constant_flux_dict = {
-        'GLC_total_input': ((keyword.whole_body, keyword.gut), 100),
+        **MFASettings.user_defined_constant_flux_dict,
     }
     user_defined_specific_flux_range_dict = {
         **MFASettings.user_defined_specific_flux_range_dict,

@@ -404,6 +404,12 @@ def constraint_loss_operation_constructor(
 
 
 def constraint_matrix_verification_and_simplification(constraint_matrix, right_side_array, computation_eps):
+    """
+        constraint_matrix may contain extra unnecessary constraints, which makes the whole problem unsolvable.
+        This function is to identify and remove linearly dependent (redundant) rows from the constraint matrix to
+        ensure full row rank, while verifying that any removed redundant constraints are consistent with the
+        remaining system (i.e., not incompatible).
+    """
     raw_constraint_num, variable_num = constraint_matrix.shape
     _, flux_constraint_matrix_r = np.linalg.qr(constraint_matrix.T)
     flux_constraint_matrix_l = flux_constraint_matrix_r.T
@@ -434,9 +440,19 @@ def constraint_matrix_verification_and_simplification(constraint_matrix, right_s
                 [*valid_constraint_list, constraint_matrix[redundant_row_index]],
                 updated_right_side_array])
             rank = np.linalg.matrix_rank(new_linear_system_matrix, tol=computation_eps)
-            if rank < valid_constraint_num - 1:
+            """
+            valid_constraint_num is the rank of non-redundant matrix
+
+            Adding one redundant row should not increase rank. Than rank of (
+                [*valid_constraint_list, constraint_matrix[redundant_row_index]]
+            ) should be valid_constraint_num
+            
+            Therefore, rank of new_linear_system_matrix (rank variable) should be valid_constraint_num.
+            If it is larger than valid_constraint_num, the new_linear_system_matrix is incompatible.
+            """
+            if rank < valid_constraint_num:
                 raise ValueError('Some redundant rows already exist!')
-            elif rank == valid_constraint_num:
+            elif rank > valid_constraint_num:
                 raise ValueError('Current redundant row is incompatible!')
         valid_constraint_num = len(valid_constraint_list)
         valid_constraint_matrix = np.array(valid_constraint_list)
@@ -448,6 +464,16 @@ def constraint_matrix_verification_and_simplification(constraint_matrix, right_s
     return valid_constraint_matrix, valid_right_side_array, valid_constraint_num
 
 
+def indexing_key_generator(current_array, computation_eps):
+    round_decimal_num = 10
+    decimal_format_string = f'{{:.{round_decimal_num}e}}'
+    indexing_str = ';'.join([
+        '0' if abs(current_num) < computation_eps else decimal_format_string.format(current_num)
+        for current_num in current_array
+    ])
+    return indexing_str
+
+
 def inequality_bound_matrix_simplification(
         raw_flux_coefficient_matrix, transform_matrix, valid_constraint_num,
         min_flux_vector, max_flux_vector, computation_eps):
@@ -456,17 +482,9 @@ def inequality_bound_matrix_simplification(
     If two rows have the same coefficient, the corresponding two fluxes will be identical all the time.
     One of them can be removed, and the exact bound could be the larger one in min bound, and smaller one in max bound
     """
-    def indexing_key_generator(current_array):
-        round_decimal_num = 10
-        decimal_format_string = f'{{:.{round_decimal_num}e}}'
-        indexing_str = ';'.join([
-            '0' if abs(current_num) < computation_eps else decimal_format_string.format(current_num)
-            for current_num in current_array
-        ])
-        return indexing_str
 
     def check_if_exist_and_update_min_max_bound(coefficient_array, new_min_value, new_max_value):
-        indexing_str = indexing_key_generator(coefficient_array)
+        indexing_str = indexing_key_generator(coefficient_array, computation_eps)
         if indexing_str not in existing_coefficient_dict:
             existing_coefficient_dict[indexing_str] = (new_min_value, new_max_value)
             existence = False
@@ -503,3 +521,41 @@ def inequality_bound_matrix_simplification(
     valid_max_bound_vector = np.array(final_max_bound_list)
     assert np.linalg.matrix_rank(valid_bound_coefficient_matrix, eps) == valid_bound_coefficient_matrix.shape[0]
     return valid_bound_coefficient_matrix, valid_min_bound_vector, valid_max_bound_vector
+
+
+def smaller_eq_bound_matrix_simplification(
+        complete_smaller_eq_matrix, transform_matrix, complete_smaller_eq_right_side_vector, computation_eps):
+    def check_if_exist_and_update_min_max_bound(coefficient_array, new_smaller_eq_value):
+        indexing_str = indexing_key_generator(coefficient_array, computation_eps)
+        if indexing_str not in existing_coefficient_dict:
+            existing_coefficient_dict[indexing_str] = new_smaller_eq_value
+            existence = False
+        else:
+            current_smaller_eq_value = existing_coefficient_dict[indexing_str]
+            existing_coefficient_dict[indexing_str] = min(
+                current_smaller_eq_value, new_smaller_eq_value)
+            existence = True
+        return existence, indexing_str
+
+    eps = 1e-12
+    final_row_list = []
+    final_indexing_str_list = []
+    final_smaller_eq_right_side_list = []
+    existing_coefficient_dict = {}
+    raw_transformed_smaller_eq_matrix = (complete_smaller_eq_matrix @ transform_matrix)
+    for row_index, each_row_array in enumerate(raw_transformed_smaller_eq_matrix):
+        if sum(abs(each_row_array)) < eps:
+            continue
+        existence, indexing_str = check_if_exist_and_update_min_max_bound(
+            each_row_array, complete_smaller_eq_right_side_vector[row_index])
+        if not existence:
+            final_row_list.append(row_index)
+            final_indexing_str_list.append(indexing_str)
+    for indexing_str in final_indexing_str_list:
+        smaller_eq_value = existing_coefficient_dict[indexing_str]
+        final_smaller_eq_right_side_list.append(smaller_eq_value)
+    valid_smaller_eq_matrix = complete_smaller_eq_matrix[final_row_list, :]
+    valid_transformed_smaller_eq_matrix = raw_transformed_smaller_eq_matrix[final_row_list, :]
+    valid_smaller_eq_right_side_array = np.array(final_smaller_eq_right_side_list)
+    # assert np.linalg.matrix_rank(valid_transformed_smaller_eq_matrix, eps) == valid_transformed_smaller_eq_matrix.shape[0]
+    return valid_smaller_eq_matrix, valid_transformed_smaller_eq_matrix, valid_smaller_eq_right_side_array

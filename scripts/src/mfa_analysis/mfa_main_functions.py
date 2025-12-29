@@ -33,7 +33,7 @@ def solver_dict_constructor(parameter_label_content_dict):
 
 
 def model_data_config_initialization(
-        experiment_name, running_mode, test_mode, docker_mode, suffix, parallel_num):
+        experiment_name, running_mode, test_mode, docker_mode, dataset_id, suffix, parallel_num):
     from ..model_data_combination.common_data_model_loader import common_data_model_function_loader
     data_model_object = common_data_model_function_loader(experiment_name)
 
@@ -57,7 +57,7 @@ def model_data_config_initialization(
         result_information_dict, experimental_figure_config_dict,
     ) = data_model_object.return_data_content(
         running_mode=running_mode, experiment_name=experiment_name, average=average_data,
-        **user_defined_mfa_settings.data_content_parameter_dict)
+        dataset_id=dataset_id, **user_defined_mfa_settings.data_content_parameter_dict)
 
     keyword = data_model_object.keyword
     result_process_information_dict_analysis = data_model_object.result_process_information_dict_analysis
@@ -88,7 +88,7 @@ def model_data_config_initialization(
 
 
 def multiple_tissue_model_analysis_main(
-        running_mode, experiment_name=None, mouse_id=None, suffix=None, test_mode=False, docker_mode=None,
+        running_mode, experiment_name=None, dataset_id=None, suffix=None, test_mode=False, docker_mode=None,
         parallel_num=None):
     if experiment_name is None:
         experiment_name = default_data_model_name
@@ -97,7 +97,7 @@ def multiple_tissue_model_analysis_main(
         slsqp_mfa_config, solver_parameter_dict, experimental_data_display_parameter_dict,
         final_process_parameter_dict, result_class
     ) = model_data_config_initialization(
-        experiment_name, running_mode, test_mode, docker_mode, suffix, parallel_num)
+        experiment_name, running_mode, test_mode, docker_mode, dataset_id, suffix, parallel_num)
 
     final_result_obj = result_class(
         Direct.output_direct, Direct.common_data_direct, experiment_name, suffix=suffix)

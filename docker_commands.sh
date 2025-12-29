@@ -17,11 +17,12 @@ Commands:
 Options:
   -p, --parallel NUM     Parallel number for normal slsqp solver. Invalid for tf2 solver (default: 20)
   -s, --suffix STR       Suffix for running (default: none)
+  -i, --dataset_id STR   Dataset ID label for running (default: none)
   -h, --help             Display this help message
 
 Examples:
   bash $0 start
-  bash $0 -s 1 start
+  bash $0 -s 1 -i abc start
   bash $0 stop
 EOF
   exit 1
@@ -31,12 +32,12 @@ EOF
 ## Function to start container for flux_analysis and result_process (when parallel_param == 'result')
 start_docker() {
   local image_name="$1"
-  local container_name="$2"
-  local code_parent_direct="$3"
-  local parallel_param="$4"
-  local suffix_param="$5"
+  local project_folder="$2"
+  local container_name="$3"
+  local code_parent_direct="$4"
+  local parallel_param="$5"
 
-  local code_direct="$code_parent_direct/$container_name"
+  local code_direct="$code_parent_direct/$project_folder"
   echo "Remove old container $container_name and start new in current direct..."
   echo "Code direct: $code_direct"
   docker container rm $container_name
@@ -46,8 +47,9 @@ start_docker() {
   else
     echo "Running flux_analysis..."
   fi
-  docker run -itd --shm-size=1G --name $container_name -v $code_parent_direct:$code_parent_direct -w $code_direct $image_name:latest \
-      python_main_execute.sh $parallel_param $suffix_param
+  docker run -itd --shm-size=1G --name $container_name -v $code_parent_direct:$code_parent_direct -w $code_direct \
+      -e SUFFIX=$SUFFIX -e DATASET_ID=$DATASET_ID \
+      $image_name:latest python_main_execute.sh $parallel_param
   EXIT_CODE=$?
 
   exit $EXIT_CODE
@@ -74,7 +76,7 @@ build_image() {
 }
 
 ## Parse command-line options
-OPTS=$(getopt -o p:s:h --long parallel:,suffix:,help -- "$@")
+OPTS=$(getopt -o p:s:i:h --long parallel:,suffix:,dataset_id:,help -- "$@")
 
 if [ $? -ne 0 ]; then
   echo "Failed to parse options"
@@ -86,11 +88,13 @@ eval set -- "$OPTS"
 
 ## Initialize variables with default values
 CURRENT_PATH=$PWD
-PROJECT_NAME=`basename $CURRENT_PATH`
+PROJECT_FOLDER=`basename $CURRENT_PATH`
+CONTAINER_NAME=${PROJECT_FOLDER}__${USER}
 COMMON_SCRIPT_NAME=`dirname $CURRENT_PATH`
 IMAGE_NAME="multi_organ_mfa"
 PARALLEL_NUM=20
 SUFFIX=""
+DATASET_ID=""
 MODE=""
 
 ## Process the options
@@ -104,6 +108,11 @@ while true; do
     -s | --suffix)
       SUFFIX="$2"
       echo "Suffix: '$SUFFIX'"
+      shift 2
+      ;;
+    -i | --dataset_id)
+      DATASET_ID="$2"
+      echo "Dataset ID: '$DATASET_ID'"
       shift 2
       ;;
     -h | --help)
@@ -131,15 +140,18 @@ if [ -z "$MODE" ]; then
   usage
 fi
 
+export SUFFIX="$SUFFIX"
+export DATASET_ID="$DATASET_ID"
+
 ## Run the main execution
 if [ "$MODE" = "start"  ]; then
-  start_docker $IMAGE_NAME $PROJECT_NAME $COMMON_SCRIPT_NAME $PARALLEL_NUM $SUFFIX
+  start_docker $IMAGE_NAME $PROJECT_FOLDER $CONTAINER_NAME $COMMON_SCRIPT_NAME $PARALLEL_NUM
 elif [ "$MODE" = "stop"  ]; then
-  stop_docker $PROJECT_NAME
+  stop_docker $CONTAINER_NAME
 elif [ "$MODE" = "log"  ]; then
-  docker_log $PROJECT_NAME
+  docker_log $CONTAINER_NAME
 elif [ "$MODE" = "result"  ]; then
-  start_docker $IMAGE_NAME $PROJECT_NAME $COMMON_SCRIPT_NAME $MODE
+  start_docker $IMAGE_NAME $PROJECT_FOLDER $CONTAINER_NAME $COMMON_SCRIPT_NAME $MODE
 elif [ "$MODE" = "build"  ]; then
   build_image $IMAGE_NAME
 else

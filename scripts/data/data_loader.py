@@ -1,5 +1,5 @@
 class DataSource(object):
-    example_data_20250815 = 'example_data_20250815'
+    data_20251115_ad_sema = 'data_20251115_ad_sema'
 
 
 def specific_data_dict_loader(specific_parameter, reload=False, **kwargs):
@@ -36,8 +36,8 @@ def specific_data_dict_loader(specific_parameter, reload=False, **kwargs):
 
 
 def common_data_loader(data_type, **kwargs):
-    if data_type == DataSource.example_data_20250815:
-        from .example_data_20250815.specific_data_parameters import SpecificParameters, Keyword
+    if data_type == DataSource.data_20251115_ad_sema:
+        from .data_20251115_ad_sema.specific_data_parameters import SpecificParameters, Keyword
     else:
         raise ValueError()
     specific_parameters = SpecificParameters()

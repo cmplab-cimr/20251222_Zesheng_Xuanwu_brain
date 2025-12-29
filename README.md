@@ -4,8 +4,7 @@ MFA for brain metabolism
 
 ## Getting started
 
-This script could also be executed as a raw Python project. Make sure Python 3.8 and all required packages are correctly
-installed. First switch to a target directory and download the source code:
+This script could also be executed as a raw Python project. Ensure that you have the latest version of Anaconda installed (Python 3.12 or higher). The script can be run in the `base` environment, but you will also need to install the `xlsxwriter` package. First switch to a target directory and download the source code:
 
 ```shell script
 git clone https://github.com/cmplab-cimr/20251222_Zesheng_Xuanwu_brain

@@ -2,7 +2,7 @@ from .common.packages import ValueEnum
 
 
 class ExperimentName(ValueEnum):
-    example_data_20250815 = 'example_data_20250815'
+    example_data_20250815 = 'data_20251115_ad_sema'
 
 default_data_model_name = ExperimentName.example_data_20250815
 

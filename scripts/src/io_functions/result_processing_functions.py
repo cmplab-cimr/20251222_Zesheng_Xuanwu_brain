@@ -480,12 +480,21 @@ def multiple_repeat_result_processing(
         solver_dict, final_solution_data_dict, final_loss_data_dict, final_predicted_mid_data_dict,
         repeat_division_num=1, each_optimization_num=None, loss_percentile=None, select_num=None):
     def index_start_end_generator(total_num, batch_num, optimization_num, start_index=0):
+        if total_num == 0:
+            return
         if optimization_num is not None:
             base_num = optimization_num
             if batch_num is None:
                 batch_num = total_num // base_num
         else:
+            if batch_num is not None and batch_num > total_num:
+                batch_num = total_num
             base_num = total_num // batch_num
+
+        if base_num == 0:
+            return
+
+
         remainder = total_num % base_num
         size_list = [base_num] * batch_num
         current_start_index = start_index

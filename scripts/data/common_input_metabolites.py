@@ -1,36 +1,6 @@
 from scripts.src.core.common.config import CoreConstants
 from scripts.src.core.data.data_class import InputMetaboliteData
 
-glucose_6_labeled_dict = {
-    "ratio_list":
-        [
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-        ],
-    "abundance": 1,
-}
-
-glucose_6_labeled_input_metabolite_dict = {
-    "GLC_inf": [
-        {
-            "ratio_list":
-                [
-                    1,
-                    1,
-                    1,
-                    1,
-                    1,
-                    1,
-                ],
-            "abundance": 1,
-        },
-    ],
-}
-
 glucose_unlabeled_dict = {
     "ratio_list":
         [CoreConstants.natural_c13_ratio] * 6,

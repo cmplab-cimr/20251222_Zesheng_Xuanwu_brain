@@ -237,6 +237,7 @@ class ModelKeyword(object):
 
     cortex = 'cortex'
     hippocampus = 'hippocampus'
+    hypothalamus = 'hypothalamus'
     basal_ganglia = 'basal_ganglia'
     cerebellum = 'cerebellum'
     brainstem = 'brainstem'

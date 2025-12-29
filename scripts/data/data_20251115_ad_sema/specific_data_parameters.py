@@ -31,18 +31,11 @@ data_metabolite_to_standard_name_dict = TransformDict({
     'c20h32n6o12s2': 'l-palmitoylcarnitine',
 })
 
-glucose_6_labeled_input_metabolite_dict = {
-    "GLC_e": [
+u_labeled_glucose_ratio_list = [0.99] * 6
+u_glucose_labeled_input_metabolite_dict = {
+    "GLC_inf": [
         {
-            "ratio_list":
-                [
-                    1,
-                    1,
-                    1,
-                    1,
-                    1,
-                    1,
-                ],
+            "ratio_list": u_labeled_glucose_ratio_list,
             "abundance": 1,
         },
     ],
@@ -51,23 +44,18 @@ glucose_6_labeled_input_metabolite_dict = {
 class Keyword(object):
     labeling = 'labeling'
     tissue = 'tissue'
-    exercise = 'exercise'
+    strain = 'strain'
     condition = 'condition'
     index = 'index'
 
-    sucrose = 'sucrose'
-    sucrose_2 = 'sucrose_2'
+    glucose = 'glucose'
+    pyruvate = 'pyruvate'
 
-    whole_body = 'whole_body'
-    gut = 'gut'
-
+    wt = 'wt'
+    ad = 'ad'
     ctrl = 'ctrl'
-    mr = 'mr'
-    tau = 'tau'
-    mr_tau = 'mr_tau'
-
-    no_exec = 'no_exec'
-    with_exec = 'with_exec'
+    sema = 'semaglutide'
+    ctrl_vs_sema = 'ctrl_vs_semaglutide'
 
     prefix = 'prefix'
 
@@ -84,51 +72,66 @@ class Keyword(object):
 
     display_mid_name_dict = {
         '2-phosphoglycerate/3-phosphoglycerate': '2pg/3pg',
-        'fructose 6-phosphate/glucose 6-phosphate': 'g6p/f6p',
         'glycerol 3-phosphate': 'glycerol 3-p',
-        'glucose 6-phosphate': 'glucose 6-p',
-        'fructose 6-phosphate': 'fructose 6-p',
-        'fructose 1,6-bisphosphate': 'fructose 16-bp',
     }
 
     display_tissue_name_dict = {
-        whole_body: 'whole_body',
-        gut: 'gut',
+        ModelKeyword.hippocampus: 'hippo',
+        ModelKeyword.hypothalamus: 'hypotha',
+        ModelKeyword.q_muscle: 'quads',
+        ModelKeyword.soleus_muscle: 'soleus',
+        ModelKeyword.brown_adipose: 'BAT',
+        ModelKeyword.colon: 'ileum',
     }
 
 
 class SpecificParameters(CompleteDataset):
-    data_name = 'example_data_20250815'
+    data_name = 'data_20251115_ad_sema'
 
     def __init__(self):
         super(SpecificParameters, self).__init__()
+        self.deconvolve_other_atoms = True
         self.mixed_compartment_list = ('c', 'm')
-        self.special_compartment_tissue_dict = {}
-
-        self.current_direct = f'{Direct.data_direct}/{self.data_name}'
-        self.pickle_file_path = f'{self.current_direct}/complete_data.pickle'
-
-        self.input_metabolite_data_dict = input_mid_data_processor(glucose_6_labeled_input_metabolite_dict)
-        self.combined_data = False
-        self.deconvolve_other_atoms = False
-
-        first_sheet_name_list = ['WB - + full', 'gut- full', 'gut (ctrl, MR-Tau) - + full']
-        file_name_sheet_name_dict = {
-            '13C6-Sucrose WB Gut full.xlsx': first_sheet_name_list,
+        self.special_compartment_tissue_dict = {
+            ModelKeyword.serum: ('e', 'c', 'm')
         }
-        self.first_sheet_name_list = first_sheet_name_list
-        self.file_name_list = list(file_name_sheet_name_dict.keys())
-        self.file_path_list = [f'{self.current_direct}/{file_name}' for file_name in file_name_sheet_name_dict.keys()]
-        index_col_name = 'Name'
-        gut_mfa_excluded_metabolite_dict = {
-            'fructose 1,6-bisphosphate': None,
-            'glucose 6-phosphate': None,
-            'fructose 6-phosphate': None,
-            'a-ketoglutarate': None,
-            '2-phosphoglycerate/3-phosphoglycerate': None,
+        self.current_direct = f'{Direct.data_direct}/{self.data_name}'
+        file_name_list = [
+            'TSQ2511-288-ST-GLC-AA-FLUX-raw.xlsx',
+            'TSQ2511-288-ST-GLC-FLUX-raw.xlsx',
+        ]
+        self.file_name_list = file_name_list
+        self.file_path_list = [f'{self.current_direct}/{file_name}' for file_name in file_name_list]
+        self.pickle_file_path = f'{self.current_direct}/complete_data.pickle'
+        self.input_metabolite_data_dict = input_mid_data_processor(u_glucose_labeled_input_metabolite_dict)
+        self.combined_data = False
+
+        # self.sheet_name_dict = {
+        #     'Sheet-1': None,
+        # }
+        common_sheet_name = 'Sheet-1'
+        index_col_name = 'Compound'
+        serum_mfa_excluded_metabolite_dict = {}
+        common_mfa_excluded_metabolite_dict = {
+            # 'fructose 1,6-bisphosphate': None,
+            # 'glucose 6-phosphate': None,
+            # 'fructose 6-phosphate': None,
+            # 'a-ketoglutarate': None,
+            # '2-phosphoglycerate/3-phosphoglycerate': None,
+            # 'glucose',
+            # 'pyruvate': None,
         }
         self.mfa_exclude_metabolites_dict = {
-            Keyword.gut: gut_mfa_excluded_metabolite_dict,
+            ModelKeyword.serum: serum_mfa_excluded_metabolite_dict,
+            ModelKeyword.cortex: common_mfa_excluded_metabolite_dict,
+            ModelKeyword.hippocampus: common_mfa_excluded_metabolite_dict,
+            ModelKeyword.hypothalamus: common_mfa_excluded_metabolite_dict,
+            ModelKeyword.liver: common_mfa_excluded_metabolite_dict,
+            ModelKeyword.kidney: common_mfa_excluded_metabolite_dict,
+            ModelKeyword.q_muscle: common_mfa_excluded_metabolite_dict,
+            ModelKeyword.soleus_muscle: common_mfa_excluded_metabolite_dict,
+            ModelKeyword.brown_adipose: common_mfa_excluded_metabolite_dict,
+            ModelKeyword.colon: common_mfa_excluded_metabolite_dict,
         }
         self.specific_dimension_metabolite_dict = {
             'acetyl-coa': 2,
@@ -154,105 +157,108 @@ class SpecificParameters(CompleteDataset):
             'succinate': 4,
             'malate': 4,
         }
-        self.compound_replace_dict = {
-            'C4N7NO4': 'C4H7NO4'
+        self.tissue_label_name_dict = {
+            '0': ModelKeyword.serum,
+            '1': ModelKeyword.cortex,
+            '2': ModelKeyword.hippocampus,
+            '3': ModelKeyword.hypothalamus,
+            '4': ModelKeyword.liver,
+            '5': ModelKeyword.kidney,
+            '6': ModelKeyword.q_muscle,
+            '7': ModelKeyword.soleus_muscle,
+            '8': ModelKeyword.brown_adipose,
+            '9': ModelKeyword.colon,
         }
-        self.condition_standard_name_dict = {
-            'Ctrl': Keyword.ctrl,
-            'MR': Keyword.mr,
-            'Tau': Keyword.tau,
-            'MR-Tau': Keyword.mr_tau,
-            'MR+Tau': Keyword.mr_tau,
+        ctrl_condition_list = ['A', 'B', 'C', 'D', 'E', 'F']
+        sema_condition_list = ['G', 'H', 'I', 'J', 'K', 'L']
+        group_condition_name_dict = {
+            **{key: (Keyword.ad, Keyword.ctrl, index + 1) for index, key in enumerate(ctrl_condition_list)},
+            **{key: (Keyword.ad, Keyword.sema, index + 1) for index, key in enumerate(sema_condition_list)},
         }
-        self.sheet_name_tissue_dict = {
-            'WB - + full': Keyword.whole_body,
-            'gut- full': Keyword.gut,
-            'gut (ctrl, MR-Tau) - + full': Keyword.gut,
+        self.group_condition_name_dict = {
+            **group_condition_name_dict
         }
+        self.common_prefix = 'M-1ul-'
+        excluded_column_name_dict = {}
+        for pf1 in range(10):
+            for pf2 in range(1, 3):
+                column_name = f'{pf1}QC{pf2}-1ul'
+                excluded_column_name_dict[column_name] = None
         self.excluded_column_name_dict = {
-            'ID': None,
-            'MZ': None,
+            'Expected RT': None,
+            'm/z (Expected)': None,
+            **excluded_column_name_dict,
         }
-        complete_data_parameter_dict_dict = {}
-        for (file_name, each_file_sheet_name_list), file_path in zip(
-                file_name_sheet_name_dict.items(), self.file_path_list):
-            for sheet_index, each_sheet_name in enumerate(each_file_sheet_name_list):
-                if sheet_index == 0:
-                    skip_row_num = 0
-                else:
-                    skip_row_num = 1
-                complete_data_parameter_dict_dict[f'{file_name}_{each_sheet_name}'] = {
-                    'xlsx_file_path': file_path,
-                    'xlsx_sheet_name': each_sheet_name,
-                    'skip_row_num': skip_row_num,
-                    'index_col_name': index_col_name,
-                    'mixed_compartment_list': self.mixed_compartment_list,
-                    'to_standard_name_dict': data_metabolite_to_standard_name_dict,
-                    'specific_dimension_metabolite_dict': self.specific_dimension_metabolite_dict,
-                    'compound_replace_dict': self.compound_replace_dict,
-                    'excluded_column_name_dict': self.excluded_column_name_dict,
-                    'decipher_column_name': self._decipher_column_name,
-                    'mfa_exclude_metabolites_dict': self.mfa_exclude_metabolites_dict,
-                    'special_compartment_tissue_dict': self.special_compartment_tissue_dict,
-                }
-        self._complete_data_parameter_dict_dict = complete_data_parameter_dict_dict
+        self.compound_replace_dict = {
+            'Aspartic acid*C4N7NO4': 'Aspartic acid*C4H7NO4'
+        }
+        self._complete_data_parameter_dict_dict = {
+            file_name: {
+                'xlsx_file_path': file_path,
+                'xlsx_sheet_name': common_sheet_name,
+                'index_col_name': index_col_name,
+                'mixed_compartment_list': self.mixed_compartment_list,
+                'to_standard_name_dict': data_metabolite_to_standard_name_dict,
+                'specific_dimension_metabolite_dict': self.specific_dimension_metabolite_dict,
+                'compound_replace_dict': self.compound_replace_dict,
+                'excluded_column_name_dict': self.excluded_column_name_dict,
+                'decipher_column_name': self._decipher_column_name,
+                'mfa_exclude_metabolites_dict': self.mfa_exclude_metabolites_dict,
+                'special_compartment_tissue_dict': self.special_compartment_tissue_dict
+            }
+            for file_name, file_path in zip(file_name_list, self.file_path_list)
+        }
 
     @staticmethod
-    def project_name_generator(labeling, exercise, condition_name, index):
-        return f'{labeling}__{condition_name}{'+' if exercise == Keyword.with_exec else '-'}__{index}'
+    def project_name_generator(labeling, strain_name, condition_name, index):
+        return f'{labeling}__{strain_name}__{condition_name}__{index}'
 
     def add_data_sheet(self, sheet_name, current_data_dict):
-        if sheet_name.endswith(self.first_sheet_name_list[-1]):
-            labeling_name = Keyword.sucrose_2
-        else:
-            labeling_name = Keyword.sucrose
+        labeling_name = Keyword.glucose
         if labeling_name not in self.complete_dataset:
             self.complete_dataset[labeling_name] = {}
-        for exercise, each_exercise_dict in current_data_dict.items():
-            if exercise not in self.complete_dataset[labeling_name]:
-                self.complete_dataset[labeling_name][exercise] = {}
-            for condition_name, each_condition_data in each_exercise_dict.items():
-                if condition_name not in self.complete_dataset[labeling_name][exercise]:
-                    self.complete_dataset[labeling_name][exercise][condition_name] = {}
+        for strain_name, each_strain_data in current_data_dict.items():
+            if strain_name not in self.complete_dataset[labeling_name]:
+                self.complete_dataset[labeling_name][strain_name] = {}
+            for condition_name, each_condition_data in each_strain_data.items():
+                if condition_name not in self.complete_dataset[labeling_name][strain_name]:
+                    self.complete_dataset[labeling_name][strain_name][condition_name] = {}
                 for index_num, each_index_data in each_condition_data.items():
-                    if index_num not in self.complete_dataset[labeling_name][exercise][condition_name]:
-                        self.complete_dataset[labeling_name][exercise][condition_name][index_num] = each_index_data
+                    if index_num not in self.complete_dataset[labeling_name][strain_name][condition_name]:
+                        self.complete_dataset[labeling_name][strain_name][condition_name][index_num] = each_index_data
                     else:
-                        self.complete_dataset[labeling_name][exercise][condition_name][index_num].update(each_index_data)
+                        self.complete_dataset[labeling_name][strain_name][condition_name][index_num].update(
+                            each_index_data)
 
     def return_multi_tissue_mfa_data_dict(self):
-        current_input_metabolite_data_dict = input_mid_data_processor(glucose_6_labeled_input_metabolite_dict)
+        current_input_metabolite_data_dict = input_mid_data_processor(u_glucose_labeled_input_metabolite_dict)
         final_mfa_data_dict = {}
         final_result_information_dict = {}
         for labeling, each_labeling_data_dict in self.complete_dataset.items():
-            for exercise, each_exercise_dict in each_labeling_data_dict.items():
-                for condition, each_condition_data_dict in each_exercise_dict.items():
+            for strain, each_strain_data_dict in each_labeling_data_dict.items():
+                for condition, each_condition_data_dict in each_strain_data_dict.items():
                     for index_num, current_mid_data_dict in each_condition_data_dict.items():
-                        project_name = self.project_name_generator(labeling, exercise, condition, index_num)
+                        project_name = self.project_name_generator(labeling, strain, condition, index_num)
                         mfa_data_obj = MFAData(
                             project_name, current_mid_data_dict, current_input_metabolite_data_dict,
                             combined_data=self.combined_data, ratio_dict_to_objective_func=None)
                         final_mfa_data_dict[project_name] = mfa_data_obj
                         final_result_information_dict[project_name] = {
                             Keyword.labeling: labeling,
-                            Keyword.exercise: exercise,
+                            Keyword.strain: strain,
                             Keyword.condition: condition,
                             Keyword.index: index_num,
                         }
         return final_mfa_data_dict, final_result_information_dict
 
     def _decipher_column_name(self, raw_column_name):
-        if raw_column_name.endswith('+'):
-            exercise = Keyword.with_exec
-        elif raw_column_name.endswith('-'):
-            exercise = Keyword.no_exec
-        else:
-            raise ValueError()
-        condition_str, index_str = raw_column_name[:-1].split(' ')
-        condition_name = self.condition_standard_name_dict[condition_str]
-        assert index_str.isdigit()
-        index_num = int(index_str)
-        return exercise, condition_name, index_num
+        assert raw_column_name.startswith(self.common_prefix)
+        group_tissue_str = raw_column_name[len(self.common_prefix):]
+        group_label = group_tissue_str[0]
+        tissue_label = group_tissue_str[1:]
+        strain_name, condition_name, index_num = self.group_condition_name_dict[group_label]
+        tissue_name = self.tissue_label_name_dict[tissue_label]
+        return strain_name, condition_name, index_num, tissue_name
 
     def target_metabolite_data_loader(
             self, xlsx_file_path, xlsx_sheet_name, mixed_compartment_list=('c', 'm'),
@@ -266,7 +272,6 @@ class SpecificParameters(CompleteDataset):
             excluded_metabolite_name_set = set()
         if to_standard_name_dict is None:
             to_standard_name_dict = TransformDict()
-        tissue_name = self.sheet_name_tissue_dict[xlsx_sheet_name]
         raw_data_frame = pd.read_excel(
             xlsx_file_path, sheet_name=xlsx_sheet_name, skiprows=skip_row_num,
             index_col=index_col_name, nrows=row_num, usecols=col_range)
@@ -274,44 +279,15 @@ class SpecificParameters(CompleteDataset):
         metabolite_name_formula_dict = {}
         current_metabolite_name = ''
         current_metabolite_group_list = []
-        c13_label = '[13C]'
         for row_index, complete_metabolite_name in enumerate(raw_data_frame.index):
             if complete_metabolite_name is np.nan:
                 continue
-            if formula_col_name is not None:
-                chemical_formula = raw_data_frame.loc[complete_metabolite_name][formula_col_name].strip()
-                if chemical_formula in compound_replace_dict:
-                    chemical_formula = compound_replace_dict[chemical_formula]
-            else:
-                chemical_formula = None
-            if c13_label in complete_metabolite_name:
-                new_chemical = False
-                c13_loc = complete_metabolite_name.index(c13_label)
-                metabolite_name = complete_metabolite_name[c13_loc + len(c13_label):]
-                num_str = complete_metabolite_name[:c13_loc]
-            elif complete_metabolite_name.endswith('-0'):
-                new_chemical = True
-                metabolite_name = complete_metabolite_name[:-len('-0')]
-                num_str = ''
-            else:
-                if '-' in complete_metabolite_name:
-                    right_minus_loc = complete_metabolite_name.rindex('-')
-                    tail_str = complete_metabolite_name[right_minus_loc + 1:]
-                    if tail_str.isdigit():
-                        new_chemical = False
-                        metabolite_name = complete_metabolite_name[:right_minus_loc]
-                        num_str = tail_str
-                    else:
-                        new_chemical = True
-                        metabolite_name = complete_metabolite_name
-                        num_str = ''
-                else:
-                    new_chemical = True
-                    metabolite_name = complete_metabolite_name
-                    num_str = ''
-            metabolite_name = to_standard_name_dict[metabolite_name.strip().lower()]
-            if not new_chemical:
+            if complete_metabolite_name in compound_replace_dict:
+                complete_metabolite_name = compound_replace_dict[complete_metabolite_name]
+            metabolite_name, formula_or_mid_index, *possible_index = complete_metabolite_name.split('*')
+            if formula_or_mid_index.startswith('m'):
                 assert current_metabolite_name == metabolite_name
+                num_str = formula_or_mid_index[1:]
                 if not num_str.isdigit():
                     raise ValueError()
                 else:
@@ -323,20 +299,20 @@ class SpecificParameters(CompleteDataset):
                 group_metabolite_row_dict[current_metabolite_name] = current_metabolite_group_list
                 current_metabolite_name = metabolite_name
                 current_metabolite_group_list = [[row_index]]
-                metabolite_name_formula_dict[current_metabolite_name] = chemical_formula
+                metabolite_name_formula_dict[current_metabolite_name] = formula_or_mid_index
         group_metabolite_row_dict[current_metabolite_name] = current_metabolite_group_list
         final_raw_data_dict = {}
         for column_name in raw_data_frame.columns:
             if column_name in excluded_column_name_dict:
                 continue
-            exercise, condition_name, index_num = decipher_column_name(column_name)
-            if exercise not in final_raw_data_dict:
-                final_raw_data_dict[exercise] = {}
-            if condition_name not in final_raw_data_dict[exercise]:
-                final_raw_data_dict[exercise][condition_name] = {}
-            if index_num not in final_raw_data_dict[exercise][condition_name]:
-                final_raw_data_dict[exercise][condition_name][index_num] = {}
-            current_raw_data_dict = final_raw_data_dict[exercise][condition_name][index_num]
+            strain_name, condition_name, index_num, tissue_name = decipher_column_name(column_name)
+            if strain_name not in final_raw_data_dict:
+                final_raw_data_dict[strain_name] = {}
+            if condition_name not in final_raw_data_dict[strain_name]:
+                final_raw_data_dict[strain_name][condition_name] = {}
+            if index_num not in final_raw_data_dict[strain_name][condition_name]:
+                final_raw_data_dict[strain_name][condition_name][index_num] = {}
+            current_raw_data_dict = final_raw_data_dict[strain_name][condition_name][index_num]
             for complete_metabolite_name, this_metabolite_all_row_list in group_metabolite_row_dict.items():
                 if complete_metabolite_name == '':
                     continue
@@ -397,33 +373,23 @@ class SpecificParameters(CompleteDataset):
     def _color_dict(self):
         from scripts.figures.common.config import ColorConfig
         color_dict_without_index = {
-            (Keyword.no_exec, Keyword.ctrl): ColorConfig.normal_blue,
-            (Keyword.no_exec, Keyword.mr): ColorConfig.orange,
-            (Keyword.no_exec, Keyword.tau): ColorConfig.light_green,
-            (Keyword.no_exec, Keyword.mr_tau): ColorConfig.light_bright_mixed_mid_red,
-            (Keyword.with_exec, Keyword.ctrl): ColorConfig.dark_blue,
-            (Keyword.with_exec, Keyword.mr): ColorConfig.dark_orange,
-            (Keyword.with_exec, Keyword.tau): ColorConfig.green,
-            (Keyword.with_exec, Keyword.mr_tau): ColorConfig.mid_red,
+            (Keyword.ad, Keyword.ctrl): ColorConfig.normal_blue,
+            (Keyword.ad, Keyword.sema): ColorConfig.orange,
         }
-        common_legend_color_dict = {
-            f'{condition}{'+' if exercise == Keyword.with_exec else '-'}': color
-            for (exercise, condition), color in color_dict_without_index.items()
+        color_name_without_index = {
+            f'{strain}_{condition}': color
+            for (strain, condition), color in color_dict_without_index.items()
         }
         legend_color_dict = {
-            Keyword.sucrose: common_legend_color_dict,
-            Keyword.sucrose_2: common_legend_color_dict,
+            Keyword.ctrl_vs_sema: color_name_without_index,
         }
         return color_dict_without_index, legend_color_dict
 
     def result_information_dict_analysis(self, complete_result_information_dict):
-        keyword = Keyword
-        data_name = SpecificParameters.data_name
-
         color_dict_without_index, _ = self._color_dict
         color_order_dict = {}
         total_index = 0
-        each_group_replicate_num = 3
+        each_group_replicate_num = 6
         for (exercise_name, condition_name), color in color_dict_without_index.items():
             for current_index in range(1, 1 + each_group_replicate_num):
                 color_order_dict[(exercise_name, condition_name, current_index)] = (total_index + current_index, color)
@@ -431,32 +397,46 @@ class SpecificParameters(CompleteDataset):
 
         return_parameter_list = []
         for result_label, current_result_information_dict in complete_result_information_dict.items():
-            major_key = current_result_information_dict[keyword.labeling]
-            exercise = current_result_information_dict[keyword.exercise]
-            exer_str = '+' if exercise == keyword.with_exec else '-'
-            condition = current_result_information_dict[keyword.condition]
-            index = current_result_information_dict[keyword.index]
+            major_key = Keyword.ctrl_vs_sema
+            strain = current_result_information_dict[Keyword.strain]
+            condition = current_result_information_dict[Keyword.condition]
+            index = current_result_information_dict[Keyword.index]
             minor_key_list = []
-            minor_key_str = f'{condition}_{index}{exer_str}'
-            order_index, current_color = color_order_dict[(exercise, condition, index)]
+            minor_key_str = f'{strain}_{condition}_{index}'
+            order_index, current_color = color_order_dict[(strain, condition, index)]
             return_parameter_list.append(
                 (result_label, major_key, minor_key_list, minor_key_str, current_color, order_index))
         return return_parameter_list
 
-    def tissue_mid_name_list_dict_constructor(self, **kwargs):
-        mid_name_list_in_one_tissue = [
-            [
-                'glucose', 'fructose 6-phosphate/glucose 6-phosphate', '2-phosphoglycerate/3-phosphoglycerate',
-                'pyruvate', 'lactate', 'glycerol 3-phosphate', 'alanine', ],
-            [
-                'citrate/isocitrate', 'glutamate', 'glutamine', 'succinate',
-                'malate', 'aspartate', ],
+    def tissue_mid_name_list_dict_constructor(self):
+        mid_name_list_in_serum = [
+            ['glucose', 'pyruvate', 'lactate', 'alanine', ],
+            ['glutamate', 'glutamine', 'aspartate', 'glycerol 3-phosphate', ]
         ]
-        complete_tissue_mid_name_list_dict = {
-            Keyword.whole_body: mid_name_list_in_one_tissue,
-            Keyword.gut: mid_name_list_in_one_tissue,
+
+        mid_name_list_in_one_tissue = [
+            ['glucose', '2-phosphoglycerate/3-phosphoglycerate', 'pyruvate', 'lactate', 'glycerol 3-phosphate',
+             'citrate', ],
+            ['glutamate', 'a-ketoglutarate', 'succinate', 'malate', 'aspartate', 'acetyl-coa'],
+        ]
+
+        brain_mid_name_list_in_one_tissue = [
+            ['glucose', '2-phosphoglycerate/3-phosphoglycerate', 'pyruvate', 'lactate', 'glycerol 3-phosphate', ],
+            ['citrate', 'a-ketoglutarate', 'glutamate', 'malate', 'aspartate', 'acetyl-coa'],
+        ]
+
+        tissue_mid_name_list_dict = {
+            ModelKeyword.serum: mid_name_list_in_serum,
+            ModelKeyword.cortex: mid_name_list_in_one_tissue,
+            ModelKeyword.hippocampus: mid_name_list_in_one_tissue,
+            ModelKeyword.hypothalamus: mid_name_list_in_one_tissue,
+            ModelKeyword.liver: mid_name_list_in_one_tissue,
+            ModelKeyword.kidney: mid_name_list_in_one_tissue,
+            ModelKeyword.q_muscle: mid_name_list_in_one_tissue,
+            ModelKeyword.soleus_muscle: mid_name_list_in_one_tissue,
+            ModelKeyword.brown_adipose: mid_name_list_in_one_tissue,
+            ModelKeyword.colon: mid_name_list_in_one_tissue,
         }
-        tissue_mid_name_list_dict = complete_tissue_mid_name_list_dict
         return (
             tissue_mid_name_list_dict, self.specific_dimension_metabolite_dict,
             Keyword.display_mid_name_dict, Keyword.display_tissue_name_dict)

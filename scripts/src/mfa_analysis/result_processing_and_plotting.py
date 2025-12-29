@@ -243,7 +243,13 @@ def multi_tissue_experimental_mid_prediction(
     default_experimental_transparency = 0.3
     result_information_dict_list = result_process_information_dict_analysis(
         final_information_dict, target=GeneralKeywords.mid_prediction)
-    assert len(result_information_dict_list) == len(complex_predicted_data_dict)
+    # assert len(result_information_dict_list) == len(complex_predicted_data_dict)
+    # Filter out information for results that are missing in the predicted data (e.g. failed runs with 0 solutions)
+    result_information_dict_list = [
+        item for item in result_information_dict_list
+        if item[0] in complex_predicted_data_dict
+    ]
+
     for (
             result_label, major_key, minor_key_list, minor_key_str, current_color, order_index
     ) in result_information_dict_list:

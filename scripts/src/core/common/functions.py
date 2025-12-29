@@ -1,4 +1,4 @@
-from .packages import np, scipy_comb, tqdm
+from .packages import np, mp, scipy_comb, tqdm
 from .config import CoreConstants
 
 
@@ -206,3 +206,27 @@ def tqdm_daemon_process_func(receive_pipe, total_num, display_title=None):
             break
         pbar.update(update_num)
 
+
+class ProgressBarExtraProcess(object):
+    def __init__(self, display_progress_bar=False, target_size=0, display_title=''):
+        self.display_progress_bar = display_progress_bar
+        self.target_size = target_size
+        self.display_title = display_title
+        self.receive_pipe = None
+        self.send_pipe = None
+        self.new_daemon_process = None
+
+    def __enter__(self):
+        if self.display_progress_bar:
+            (receive_pipe, send_pipe) = mp.Pipe()
+            new_daemon_process = mp.Process(
+                target=tqdm_daemon_process_func, args=(receive_pipe, self.target_size, self.display_title))
+            new_daemon_process.start()
+            self.send_pipe = send_pipe
+        return self.send_pipe
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if self.display_progress_bar:
+            self.send_pipe.send(-1)
+            self.new_daemon_process.join()
+            self.new_daemon_process.close()

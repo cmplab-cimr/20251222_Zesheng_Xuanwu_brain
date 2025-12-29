@@ -20,7 +20,7 @@ def arg_setting(computation_subparsers, experimental_operation_label):
     flux_analysis_parser.add_argument(
         '-s', '--suffix', default=None, help='Suffix of stored folders')
     flux_analysis_parser.add_argument(
-        '-i', '--mouse_id', default=None, help='Specific mouse id')
+        '-i', '--dataset_id', default=None, help='Specific dataset id')
     flux_analysis_parser.add_argument(
         '-t', '--test_mode', action='store_true', default=False,
         help='Whether the code is executed in test mode, which means less sample number and shorter time.')
@@ -50,6 +50,6 @@ def main(experimental_data_analysis_parser, args):
     else:
         from .mfa_main_functions import multiple_tissue_model_analysis_main
         multiple_tissue_model_analysis_main(
-            running_mode=running_mode, experiment_name=args.experiment_name, mouse_id=args.mouse_id,
+            running_mode=running_mode, experiment_name=args.experiment_name, dataset_id=args.dataset_id,
             suffix=args.suffix, test_mode=args.test_mode, docker_mode=args.docker_mode,
             parallel_num=args.parallel_num)

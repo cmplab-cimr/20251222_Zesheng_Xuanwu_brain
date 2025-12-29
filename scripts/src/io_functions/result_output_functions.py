@@ -249,7 +249,10 @@ def experimental_and_predicted_mid_materials_generator(
                 current_output_metabolite_name_list.extend((metabolite_name for _ in range(current_vector_len)))
             if append_name_and_mid and current_mid_index_list is not None:
                 current_mid_index_list.extend(range(current_vector_len))
-        if single_vector:
+        if len(mid_vector_list) == 0:
+            _mid_vector_array = np.zeros((0, 0))
+            _vector_num = 0
+        elif single_vector:
             _mid_vector_array = np.concatenate(mid_vector_list).reshape(-1, 1)
             _vector_num = 1
         else:
