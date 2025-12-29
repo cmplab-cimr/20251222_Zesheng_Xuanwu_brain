@@ -3,6 +3,7 @@ import warnings
 from ..common.packages import it, np
 from ..common.classes import DefaultDict
 from ..common.config import CoreConstants
+from ..common.functions import check_if_biomass_flux
 
 from .model_class import Reaction, CompositeReaction
 
@@ -63,12 +64,18 @@ def model_preprocess(
             product_reaction_dict_for_emu[metabolite_name].append(reaction_obj)
 
     def record_and_check_metabolite_carbon_num(reaction_obj):
+        if check_if_biomass_flux(reaction_obj.reaction_id):
+            return
         for metabolite_node in it.chain(reaction_obj.substrate_list, reaction_obj.product_list):
             metabolite_name = metabolite_node.name
             if metabolite_name not in complete_metabolite_dim_dict:
                 current_metabolite_carbon_num = len(metabolite_node.carbon_composition_list)
                 if metabolite_name not in complete_metabolite_dim_dict:
-                    complete_metabolite_dim_dict[metabolite_name] = current_metabolite_carbon_num
+                    if current_metabolite_carbon_num == 0:
+                        warnings.warn('Metabolite {} shows empty carbon str in reaction {}'.format(
+                            metabolite_name, reaction_obj.reaction_id))
+                    else:
+                        complete_metabolite_dim_dict[metabolite_name] = current_metabolite_carbon_num
                 else:
                     if current_metabolite_carbon_num != 0 and \
                             complete_metabolite_dim_dict[metabolite_name] != current_metabolite_carbon_num:

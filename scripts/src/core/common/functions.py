@@ -169,6 +169,34 @@ def biomass_reaction_dict_constructor(biomass_metabolite_name_list):
     return biomass_reaction_dict_list
 
 
+def exchange_reaction_constructor(
+        metabolite_carbon_num_list, original_compartment, target_compartment,
+        reaction_specific_suffix=None, reversible=True):
+    underline_original_compartment = f'_{original_compartment}'
+    underline_target_compartment = f'_{target_compartment}'
+    exchange_reaction_dict_list = []
+    new_metabolite_name_list = []
+    ord_a = ord('a')
+    for (metabolite_name, carbon_num) in metabolite_carbon_num_list:
+        assert metabolite_name.endswith(underline_original_compartment)
+        bare_metabolite_name = metabolite_name[:-len(underline_original_compartment)]
+        reaction_id = f'EXCHANGE_{bare_metabolite_name}_{original_compartment}_{target_compartment}'
+        if reaction_specific_suffix is not None:
+            reaction_id = f'{reaction_id}_{reaction_specific_suffix}'
+        carbon_mapping_str = ''.join([chr(ord_a + i) for i in range(carbon_num)])
+        new_metabolite_name = f'{bare_metabolite_name}{underline_target_compartment}'
+        new_reaction_dict = {
+            'id': reaction_id,
+            'sub': [(metabolite_name, carbon_mapping_str,),],
+            'pro': [(new_metabolite_name, carbon_mapping_str,)],
+        }
+        if reversible:
+            new_reaction_dict['reverse'] = True
+        exchange_reaction_dict_list.append(new_reaction_dict)
+        new_metabolite_name_list.append(new_metabolite_name)
+    return exchange_reaction_dict_list, new_metabolite_name_list
+
+
 def mid_name_process(raw_mid_name):
     emu_sep = CoreConstants.emu_carbon_list_str_sep
     modified_str_list = []

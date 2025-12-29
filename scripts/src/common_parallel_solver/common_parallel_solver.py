@@ -204,9 +204,11 @@ def each_case_optimization_distribution_iter_generator(
                 current_initial_point_num = each_case_optimization_num - current_optimization_start_index
             else:
                 current_initial_point_num = max_optimization_each_generation
-            print(f'Generating {current_initial_point_num} initial value of {result_label}...')
+            print(
+                f'Generating {current_initial_point_num} initial value of {result_label} '
+                f'with {initial_processes_num} processes...')
             total_initial_flux_input = universal_feasible_solution_generator(
-                solver_obj, current_initial_point_num, processes_num=initial_processes_num, display_progress_bar=False)
+                solver_obj, current_initial_point_num, processes_num=initial_processes_num, display_progress_bar=True)
             print(f'{result_label} initial value finished')
             for result_tuple in simple_each_case_iter_generator(
                     total_initial_flux_input, current_initial_point_num, each_process_optimization_num,
@@ -427,7 +429,13 @@ def solver_and_solution_list_construct(
     else:
         each_process_optimization_num = parallel_parameters[Keywords.each_process_optimization_num]
         max_optimization_each_generation = parallel_parameters[Keywords.max_optimization_each_generation]
-        initial_processes_num = parallel_parameters[Keywords.processes_num]
+        parallel_num = parallel_parameters[Keywords.processes_num]
+        if parallel_num >= 40:
+            initial_processes_num = parallel_num // 2
+        elif parallel_num >= 30:
+            initial_processes_num = int(parallel_num / 1.5)
+        else:
+            initial_processes_num = 20
     for result_label, (
             label_tuple, (mfa_model, mfa_data, mfa_config),
             result_information, other_information_dict) in parameter_label_content_dict.items():
