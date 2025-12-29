@@ -50,6 +50,7 @@ class MFASettings(object):
 
     result_label_obj_value_dict = None
 
+    initial_slsqp_multiple = 2
     initial_batch_multiple = 10
     initial_processes_num = 20
 
@@ -256,7 +257,8 @@ class MFASettings(object):
             else:
                 assert isinstance(parallel_num, int)
             max_optimization_each_generation = min(
-                each_process_optimization_num * parallel_num, each_case_target_optimization_num) + 1
+                int(each_process_optimization_num * parallel_num * self.initial_slsqp_multiple),
+                each_case_target_optimization_num)
             parallel_parameter_dict = {
                 ParallelSolverKeywords.max_optimization_each_generation: max_optimization_each_generation,
                 ParallelSolverKeywords.each_process_optimization_num: each_process_optimization_num,
