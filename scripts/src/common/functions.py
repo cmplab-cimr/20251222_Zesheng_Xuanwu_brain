@@ -4,24 +4,6 @@ from scripts.src.core.common.functions import reverse_reaction_name, tissue_spec
 from .packages import it
 
 
-def mid_name_process(raw_mid_name):
-    emu_sep = CoreConstants.emu_carbon_list_str_sep
-    modified_str_list = []
-    str_start = 0
-    while str_start < len(raw_mid_name):
-        emu_location = raw_mid_name.find(emu_sep, str_start)
-        if emu_location == -1:
-            modified_str_list.append(raw_mid_name[str_start:])
-            break
-        modified_str_list.append(raw_mid_name[str_start:emu_location])
-        new_start = emu_location + len(emu_sep)
-        while new_start != len(raw_mid_name) and raw_mid_name[new_start] == '1':
-            new_start += 1
-        str_start = new_start
-    modified_str = ''.join(modified_str_list)
-    return modified_str
-
-
 def default_parameter_extract(
         option_dict: dict, key, default_value=None, force=False, pop=False, repeat_default_value=False):
     def single_extract(_option_dict, _key, _default_value):
@@ -122,37 +104,6 @@ def collect_results_func_template(
         return final_mapping_dict
 
     return collect_results
-
-
-def tissue_name_breakdown(raw_name):
-    tissue_sep = CoreConstants.specific_tissue_sep
-    if tissue_sep not in raw_name:
-        return None, raw_name
-    plus = '+'
-    prefix = None
-    search_start = 0
-    main_body_list = []
-    while True:
-        sep_location = raw_name.find(tissue_sep, search_start)
-        if sep_location == -1:
-            break
-        else:
-            this_prefix = raw_name[search_start:sep_location]
-            if prefix is None:
-                prefix = this_prefix
-            else:
-                assert this_prefix == prefix
-            body_start = sep_location + len(tissue_sep)
-            next_plus_location = raw_name.find(plus, sep_location)
-            if next_plus_location == -1:
-                main_body_list.append(raw_name[body_start:])
-                break
-            else:
-                next_search_start = next_plus_location + 1
-                main_body_list.append(raw_name[body_start:next_search_start])
-                search_start = next_search_start
-    main_body = ''.join(main_body_list)
-    return prefix, main_body
 
 
 def excel_column_letter_to_0_index(raw_column_str):

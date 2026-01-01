@@ -1,10 +1,14 @@
-from .packages import np, mp, tqdm, threadpool_limits
-from .config import Keywords, random_seed, specific_solver_constructor, base_solver_constructor, parameter_extract
+from .packages import np, mp, threadpool_limits, it, time
+from .config import (
+    Keywords, random_seed, specific_solver_constructor, base_solver_constructor, parameter_extract,
+    ProgressBarExtraProcess)
 
 from .feasible_solution_generator import universal_feasible_solution_generator, complicated_feasible_solution_generator
 
 
-def slsqp_solving(slsqp_solver_obj, input_matrix, verbose=False, report_interval=50, thread_num_constraint=None):
+def slsqp_solving(
+        slsqp_solver_obj, input_matrix, verbose=False, thread_num_constraint=None,
+        send_pipe=None):
     final_time_list = []
     final_loss_list = []
     final_solution_list = []
@@ -17,6 +21,8 @@ def slsqp_solving(slsqp_solver_obj, input_matrix, verbose=False, report_interval
             final_solution, final_obj_value, success = slsqp_solver_obj.solve(input_row)
         if not success:
             continue
+        if send_pipe is not None:
+            send_pipe.send(1)
         final_solution_list.append(final_solution)
         final_loss_list.append(final_obj_value)
         final_time_list.append(slsqp_solver_obj.recorder.running_time)
@@ -25,8 +31,8 @@ def slsqp_solving(slsqp_solver_obj, input_matrix, verbose=False, report_interval
             if emu_name not in final_predicted_dict:
                 final_predicted_dict[emu_name] = []
             final_predicted_dict[emu_name].append(predicted_vector)
-        if verbose and row_index > 0 and row_index % report_interval == 0:
-            print('{} finished'.format(row_index))
+        # if verbose and row_index > 0 and row_index % report_interval == 0:
+        #     print('{} finished'.format(row_index))
     final_solution_array = np.array(final_solution_list)
     final_time_array = np.array(final_time_list)
     final_loss_array = np.array(final_loss_list)
@@ -254,7 +260,7 @@ def load_previous_results(result_label, final_result_obj, each_case_optimization
     return new_optimization_num
 
 
-def parallel_parameter_generator(result_list, test_mode, report_interval, thread_num_constraint):
+def parallel_parameter_generator(result_list, test_mode, thread_num_constraint, send_pipe):
     for (
             base_solver_obj, mfa_config, each_case_iter, result_label, result_information,
             each_case_target_optimization_num) in result_list:
@@ -263,7 +269,7 @@ def parallel_parameter_generator(result_list, test_mode, report_interval, thread
             parameter_list = (
                 base_solver_obj, mfa_config, current_initial_flux_input, test_mode,
                 result_label, result_information, current_optimization_num,
-                start_index, each_case_target_optimization_num, report_interval, thread_num_constraint)
+                start_index, each_case_target_optimization_num, thread_num_constraint, send_pipe)
             yield parameter_list
 
         # print('{} finished'.format(result_label))
@@ -273,50 +279,46 @@ def common_parallel_single_solver(parameter_list):
     (
         base_solver_obj, mfa_config, initial_flux_input, test_mode, result_label, result_information,
         current_optimization_num, start_index, each_case_target_optimization_num,
-        report_interval, thread_num_constraint) = parameter_list
+        thread_num_constraint, send_pipe) = parameter_list
     slsqp_solver_obj = specific_solver_constructor(base_solver_obj, mfa_config)
     result_list = slsqp_solving(
         slsqp_solver_obj, initial_flux_input, verbose=not test_mode,
-        report_interval=report_interval, thread_num_constraint=thread_num_constraint)
+        thread_num_constraint=thread_num_constraint, send_pipe=send_pipe)
     return result_list, result_label, result_information, slsqp_solver_obj.flux_name_index_dict, \
         slsqp_solver_obj.target_experimental_mid_data_dict, current_optimization_num, start_index, \
         each_case_target_optimization_num
 
 
 def common_parallel_solver(
-        final_result_obj, total_optimization_num, parameter_list_iter, processes_num=4, parallel_test=False,
-        **other_parameters):
+        final_result_obj, total_optimization_num, parameter_list_iter,
+        processes_num=4, parallel_test=False, **other_parameters):
     def process_result(current_raw_result):
         (
             result_list, result_label, result_information, flux_name_index_dict,
             target_experimental_mid_data_dict, current_optimization_num, start_index,
             each_case_target_optimization_num) = current_raw_result
-        pbar.update(current_optimization_num)
         final_result_obj.parallel_add_and_save_result(
             result_list, result_label, result_information, flux_name_index_dict,
             target_experimental_mid_data_dict, start_index, each_case_target_optimization_num)
 
-    """Add day to elapsed and remaining will be very troublesome for tqdm. Abort it."""
-    pbar = tqdm.tqdm(
-        total=total_optimization_num, smoothing=0, maxinterval=5,
-        desc='Computation progress of {}'.format(final_result_obj.result_name))
     if parallel_test:
         for parameter_list in parameter_list_iter:
             raw_result = common_parallel_single_solver(parameter_list)
             process_result(raw_result)
-
-    with mp.Pool(processes=processes_num) as pool:
-        raw_result_iter = pool.imap(common_parallel_single_solver, parameter_list_iter)
-        for raw_result in raw_result_iter:
-            process_result(raw_result)
+    else:
+        with mp.Pool(processes=processes_num) as pool:
+            raw_result_iter = pool.imap(common_parallel_single_solver, parameter_list_iter)
+            for raw_result in raw_result_iter:
+                process_result(raw_result)
 
 
 def parallel_solver_wrap(
-        result_list, final_result_obj, total_optimization_num, test_mode, report_interval, parallel_parameter_dict,
-        docker_mode):
+        result_list, final_result_obj, total_optimization_num, test_mode, parallel_parameter_dict,
+        docker_mode, progress_bar):
     thread_num_constraint = parallel_parameter_dict[Keywords.thread_num_constraint]
+    progress_bar.start()
     parameter_list_iter = parallel_parameter_generator(
-        result_list, test_mode, report_interval, thread_num_constraint)
+        result_list, test_mode, thread_num_constraint, progress_bar.send_pipe)
     common_parallel_solver(
         final_result_obj, total_optimization_num, parameter_list_iter,
         **parallel_parameter_dict)
@@ -324,18 +326,13 @@ def parallel_solver_wrap(
 
 
 def serial_solver_wrap(
-        result_list, final_result_obj, total_optimization_num, test_mode, report_interval, parallel_parameter_dict,
-        docker_mode):
-    pbar = tqdm.tqdm(
-        total=total_optimization_num, smoothing=0, maxinterval=5,
-        desc="Computation progress of {}".format(final_result_obj.result_name))
+        result_list, final_result_obj, total_optimization_num, test_mode, parallel_parameter_dict,
+        docker_mode, progress_bar):
     batch_solving = False
-    send_pipe = None
-    receive_pipe = None
+    send_pipe = progress_bar.send_pipe
     if parallel_parameter_dict is not None:
         if Keywords.batch_solving in parallel_parameter_dict:
             batch_solving = True
-            (receive_pipe, send_pipe) = mp.Pipe()
     for (
             base_solver_obj, mfa_config, this_case_optimization_num, result_label, result_information,
             each_case_target_optimization_num) in result_list:
@@ -357,15 +354,12 @@ def serial_solver_wrap(
                     final_result_obj, result_label, result_information, base_solver_obj, mfa_config, initial_flux_input,
                     this_case_optimization_num, None, send_pipe, parallel_parameter_dict, not test_mode))
             new_solving_process.start()
-            while True:
-                update_num = receive_pipe.recv()
-                if update_num < 0:
-                    break
-                pbar.update(update_num)
+            progress_bar.start()
             new_solving_process.join()
             new_solving_process.close()
         else:
             slsqp_obj = specific_solver_constructor(base_solver_obj, mfa_config)
+            progress_bar.start()
             if initial_flux_input is None:
                 initial_flux_input = universal_feasible_solution_generator(
                     slsqp_obj, this_case_optimization_num, display_progress_bar=True)
@@ -374,8 +368,8 @@ def serial_solver_wrap(
             else:
                 print('Initial flux generated')
                 result_list = slsqp_solving(
-                    slsqp_obj, initial_flux_input, verbose=not test_mode, report_interval=report_interval)
-                pbar.update(this_case_optimization_num)
+                    slsqp_obj, initial_flux_input, verbose=not test_mode)
+                send_pipe.send(this_case_optimization_num)
                 print(f'{result_label} ended')
                 final_result_obj.add_and_save_result(
                     result_label, result_information, result_list, slsqp_obj.flux_name_index_dict,
@@ -384,11 +378,8 @@ def serial_solver_wrap(
 
 
 def batch_solver_docker_wrap(
-        result_list, final_result_obj, total_optimization_num, test_mode, report_interval, parallel_parameter_dict,
-        docker_mode):
-    pbar = tqdm.tqdm(
-        total=total_optimization_num, smoothing=0, maxinterval=5,
-        desc="Computation progress of {}".format(final_result_obj.result_name))
+        result_list, final_result_obj, total_optimization_num, test_mode, parallel_parameter_dict,
+        docker_mode, progress_bar):
     exit_code = 3
     for result_index, (
             base_solver_obj, mfa_config, this_case_optimization_num, result_label, result_information,
@@ -406,9 +397,10 @@ def batch_solver_docker_wrap(
             this_case_optimization_num = len(initial_flux_input)
         else:
             raise ValueError()
+        progress_bar.start()
         batch_continuously_solving_func(
             final_result_obj, result_label, result_information, base_solver_obj, mfa_config, initial_flux_input,
-            this_case_optimization_num, pbar, None, parallel_parameter_dict, not test_mode)
+            this_case_optimization_num, None, progress_bar.send_pipe, parallel_parameter_dict, not test_mode)
         print(f'batch_solver_docker for {result_label} finished. Exit')
         if result_index == len(result_list) - 1:
             exit_code = 0
@@ -504,8 +496,9 @@ def solver_and_solution_list_construct(
 
 def common_solver(
         parameter_label_content_dict, final_result_obj, test_mode, each_case_target_optimization_num,
-        report_interval, parallel_parameter_dict=None, load_results=False,
-        predefined_initial_solution_matrix_loader=None, docker_mode=None):
+        parallel_parameter_dict=None, load_results=False,
+        predefined_initial_solution_matrix_loader=None, docker_mode=None, display_progress_bar=True,
+        **other_parameters):
     batch_solving = False
     if parallel_parameter_dict is None:
         solver_wrap = serial_solver_wrap
@@ -517,11 +510,17 @@ def common_solver(
             solver_wrap = batch_solver_docker_wrap
     else:
         solver_wrap = parallel_solver_wrap
+
     result_list, total_optimization_num = solver_and_solution_list_construct(
         parameter_label_content_dict, final_result_obj, test_mode, each_case_target_optimization_num,
         load_results, parallel_parameter_dict, predefined_initial_solution_matrix_loader, batch_solving)
-    exit_code = solver_wrap(
-        result_list, final_result_obj, total_optimization_num, test_mode, report_interval,
-        parallel_parameter_dict, docker_mode)
+    display_title = 'Computation progress of {}'.format(final_result_obj.result_name)
+    with ProgressBarExtraProcess(
+            display_progress_bar=display_progress_bar, target_size=total_optimization_num, display_title=display_title,
+            manual_start=True
+    ) as progress_bar:
+        exit_code = solver_wrap(
+            result_list, final_result_obj, total_optimization_num, test_mode,
+            parallel_parameter_dict, docker_mode, progress_bar)
     return exit_code
 

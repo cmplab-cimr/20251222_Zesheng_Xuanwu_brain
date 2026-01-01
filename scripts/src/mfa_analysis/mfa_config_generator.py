@@ -202,7 +202,6 @@ class MFASettings(object):
                 batch_size, each_portion_flux_num, nnls_parallel_num, emu_value_parallel_num
             ) = parameter_tuple_for_each_suffix_dict[suffix]
             each_case_target_optimization_num = self.optimization_num_for_each_suffix_dict[suffix]
-        # max_optimization_each_generation = int(1.1 * batch_size)
         max_optimization_each_generation = self.initial_batch_multiple * batch_size
         initial_processes_num = self.initial_processes_num
         emu_gradient_hessian_parallel_num = 3

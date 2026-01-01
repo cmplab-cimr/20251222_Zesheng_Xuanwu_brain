@@ -75,11 +75,6 @@ class FinalResult(object):
         check_and_mkdir_of_direct(current_result_path)
         return self._generate_path_given_result_path(current_result_path)
 
-    # def _generate_solution_id_path(self, current_result_label):
-    #     current_solution_id_array_path = '{}/{}/{}'.format(
-    #         self.raw_result_data_output_direct, current_result_label, Direct.solution_id_array)
-    #     return current_solution_id_array_path
-
     def _check_and_convert_object_matrix_to_numeric(self, array_path, array_label):
         print(f'{array_label} array of {self.result_name} is not pure number. Checking it...')
         raw_array = npz_load(array_path, array_label, allow_pickle=True)
@@ -300,7 +295,22 @@ class FinalResult(object):
             result_label, final_solution_array, final_time_array, final_loss_array,
             final_predicted_dict, current_result_information, flux_name_index_dict, target_experimental_mid_data_dict)
 
-    def iteration(self, raw_result_label, process_mid_name=True, result_label_suffix_tuple=()):
+    def mid_name_process(self, raw_mid_name):
+        processed_mid_name_dict = self.processed_mid_name_dict
+        if raw_mid_name in processed_mid_name_dict:
+            modified_mid_name = processed_mid_name_dict[raw_mid_name]
+        else:
+            modified_mid_name = mid_name_process(raw_mid_name)
+            processed_mid_name_dict[raw_mid_name] = modified_mid_name
+        return modified_mid_name
+
+    def flux_name_process(self, complete_flux_name):
+        return None, complete_flux_name
+
+    def target_mid_name_process(self, raw_target_mid_name):
+        return self.mid_name_process(raw_target_mid_name)
+
+    def iteration(self, raw_result_label, process_mid_name=True, result_label_suffix_tuple=(), solver_obj=None):
         if len(result_label_suffix_tuple) == 0:
             with_suffix = False
             result_label_suffix_tuple = (None,)
@@ -309,8 +319,7 @@ class FinalResult(object):
         loss_array_list = []
         time_array_list = []
         solution_array_list = []
-        flux_name_index_dict = None
-        processed_mid_name_dict = self.processed_mid_name_dict
+        flux_name_index_dict = {}
         predicted_data_dict = {}
         target_experimental_mid_data_dict = {}
         result_information_dict = None
@@ -332,15 +341,19 @@ class FinalResult(object):
             except FileNotFoundError:
                 continue
             print(f'Load data set named as {result_label} with {tmp_loss_array.shape[0]} items')
-            if flux_name_index_dict is None:
-                flux_name_index_dict = tmp_flux_name_index_dict
-            else:
-                assert flux_name_index_dict == tmp_flux_name_index_dict
+            for complicated_flux_name, flux_index in tmp_flux_name_index_dict.items():
+                self.flux_name_process(complicated_flux_name)
+                if complicated_flux_name not in flux_name_index_dict:
+                    flux_name_index_dict[complicated_flux_name] = flux_index
+                else:
+                    assert flux_name_index_dict[complicated_flux_name] == flux_index
+
             if result_information_dict is None:
                 result_information_dict = tmp_result_information_dict
             else:
                 assert result_information_dict == tmp_result_information_dict
 
+            solution_num = tmp_solution_array.shape[0]
             if not with_suffix:
                 loss_array_list = tmp_loss_array
                 time_array_list = tmp_time_array
@@ -350,29 +363,36 @@ class FinalResult(object):
                 time_array_list.append(tmp_time_array)
                 solution_array_list.append(tmp_solution_array)
 
+            predicted_mid_num = 0
             for mid_name, mid_value in tmp_raw_predicted_dict.items():
+                this_mid_num = len(mid_value)
+                if predicted_mid_num == 0:
+                    predicted_mid_num = this_mid_num
+                else:
+                    assert predicted_mid_num == this_mid_num
                 if process_mid_name:
-                    if mid_name not in processed_mid_name_dict:
-                        processed_mid_name = mid_name_process(mid_name)
-                        processed_mid_name_dict[mid_name] = processed_mid_name
-                    else:
-                        processed_mid_name = processed_mid_name_dict[mid_name]
+                    processed_mid_name = self.mid_name_process(mid_name)
                 else:
                     processed_mid_name = mid_name
                 if processed_mid_name not in predicted_data_dict:
                     predicted_data_dict[processed_mid_name] = []
                 predicted_data_dict[processed_mid_name].extend(mid_value)
+
             for raw_mid_name, experimental_mid_data in tmp_raw_target_experimental_mid_data_dict.items():
-                if raw_mid_name in predicted_data_dict:
-                    processed_mid_name = raw_mid_name
-                elif raw_mid_name in processed_mid_name_dict:
-                    processed_mid_name = processed_mid_name_dict[raw_mid_name]
-                else:
-                    processed_mid_name = mid_name_process(raw_mid_name)
+                processed_mid_name = self.target_mid_name_process(raw_mid_name)
                 if processed_mid_name not in target_experimental_mid_data_dict:
                     target_experimental_mid_data_dict[processed_mid_name] = experimental_mid_data
                 else:
                     assert np.all(experimental_mid_data == target_experimental_mid_data_dict[processed_mid_name])
+
+            if predicted_mid_num < solution_num:
+                self._generate_predicted_mid_data_dict(
+                    solution_num, predicted_mid_num, result_label,
+                    tmp_solution_array, solver_obj, predicted_data_dict, target_experimental_mid_data_dict,
+                    process_mid_name=True)
+                pickle_save(predicted_data_dict, predicted_dict_path)
+
+
         if len(loss_array_list) == 0:
             loss_array = np.zeros([0], dtype='float64')
             time_array = np.zeros([0], dtype='float64')
@@ -408,7 +428,7 @@ class FinalResult(object):
             other_final_result_obj.final_time_data_dict
         )
 
-    def load_current_result_label(self, result_label, result_label_suffix_tuple=()):
+    def load_current_result_label(self, result_label, result_label_suffix_tuple=(), solver_obj=None):
         (
             self.final_loss_data_dict[result_label], self.final_solution_data_dict[result_label],
             self.final_flux_name_index_dict[result_label],
@@ -416,7 +436,7 @@ class FinalResult(object):
             self.final_predicted_data_dict[result_label],
             self.final_target_experimental_mid_data_dict[result_label],
             self.final_time_data_dict[result_label]
-        ) = self.iteration(result_label, result_label_suffix_tuple=result_label_suffix_tuple)
+        ) = self.iteration(result_label, result_label_suffix_tuple=result_label_suffix_tuple, solver_obj=solver_obj)
 
     def _load_previous_results(self, raw_result_label, out_of_order=False):
         result_label = self._update_result_label(raw_result_label)
@@ -459,7 +479,8 @@ class FinalResult(object):
     def repair_predicted_mid_dict_and_merge(self, solver_dict):
         for result_label, solver_obj in solver_dict.items():
             loss_array, solution_array, flux_name_index_dict, result_information_dict, predicted_data_dict, \
-                target_experimental_mid_data_dict, time_array = self.iteration(result_label, process_mid_name=False)
+                target_experimental_mid_data_dict, time_array = self.iteration(
+                result_label, process_mid_name=False, solver_obj=solver_obj)
             new_predicted_data_dict = self._repair_predicted_mid_data_dict(solver_obj, solution_array)
             replaced_mid_count = 0
             total_mid_count = None
@@ -484,7 +505,8 @@ class FinalResult(object):
     def repair_target_experimental_mid_data_dict(self, solver_dict):
         for result_label, solver_obj in solver_dict.items():
             loss_array, solution_array, flux_name_index_dict, result_information_dict, predicted_data_dict, \
-                target_experimental_mid_data_dict, time_array = self.iteration(result_label, process_mid_name=False)
+                target_experimental_mid_data_dict, time_array = self.iteration(
+                result_label, process_mid_name=False, solver_obj=solver_obj)
             new_target_experimental_mid_data_dict = {}
             for raw_target_mid_name, experimental_mid_data_vector in target_experimental_mid_data_dict.items():
                 last_underline_index = raw_target_mid_name.rindex('_')
@@ -544,10 +566,6 @@ class FinalResult(object):
             self.data_count_dict[current_result_label] = 0
         self.data_count_dict[current_result_label] += current_solution_array.shape[0]
 
-    # def _save_solution_id(self, current_result_label, solution_id_array):
-    #     current_solution_id_array_path = self._generate_solution_id_path(current_result_label)
-    #     npz_save(current_solution_id_array_path, **{Direct.solution_id_array: solution_id_array})
-
     def resave_all_content(self, ):
         for result_label, final_solution_array in self.final_solution_data_dict.items():
             current_time_array = self.final_time_data_dict[result_label]
@@ -565,6 +583,34 @@ class FinalResult(object):
                 self.final_predicted_data_dict[result_label], current_result_information,
                 current_flux_name_index_dict, current_target_experimental_mid_data_dict,
                 solution_id_array=current_solution_id)
+
+    def _generate_predicted_mid_data_dict(
+            self, complete_solution_num, current_predicted_data_num, current_result_label, complete_solution_array,
+            current_solver, current_predicted_data_dict, current_target_experimental_mid_data_dict,
+            process_mid_name):
+        from .common_parallel_predictor import multi_solver_parallel_predictor
+        print(f'Generating predicted MID for {complete_solution_num - current_predicted_data_num} '
+              f'solutions in data set {current_result_label}')
+        this_solution_raw_predicted_mid_data_dict_list, _ = multi_solver_parallel_predictor(
+            [complete_solution_array[current_predicted_data_num:]],
+            slsqp_solver_obj_list=[current_solver],
+            processes_num=12, predict_all_mid=False, parallel_test=False, display_progress_bar=True,
+            name=current_result_label)
+        all_solution_raw_predicted_mid_data_dict = this_solution_raw_predicted_mid_data_dict_list[0]
+        for raw_mid_name, all_mid_array in all_solution_raw_predicted_mid_data_dict.items():
+            if process_mid_name:
+                processed_mid_name = self.mid_name_process(raw_mid_name)
+            else:
+                processed_mid_name = raw_mid_name
+            if processed_mid_name not in current_target_experimental_mid_data_dict:
+                continue
+            if processed_mid_name not in current_predicted_data_dict:
+                current_predicted_data_dict[processed_mid_name] = []
+            current_predicted_data_dict[processed_mid_name].extend(all_mid_array)
+
+        for mid_name, each_mid_data_array in current_predicted_data_dict.items():
+            assert len(each_mid_data_array) == complete_solution_num
+        print(f'MID generation in data set {current_result_label} finished')
 
     def final_process(self, *args):
         pass

@@ -1,5 +1,6 @@
 from ..core.common.classes import OptionDict, MFAConfig, TransformDict
-from ..core.common.functions import tissue_specific_name_constructor, check_if_mix_flux
+from ..core.common.functions import (
+    tissue_specific_name_constructor, check_if_mix_flux, mid_name_process, tissue_name_breakdown)
 from ..core.common.config import ParamName, ModelKeyword, CoreConstants
 from ..common_parallel_solver.config import Keywords as ParallelSolverKeywords
 from ..common_parallel_solver.result_class import FinalResult as GeneralFinalResult
@@ -16,8 +17,8 @@ from ..common.config import (
 )
 from ..common.packages import mp, np, os
 from ..common.functions import (
-    update_parameter_object, tissue_name_breakdown, mid_name_process,
-    reversible_flux_pair_dict_generator, tissue_specific_reversible_flux_title_constructor_generator,)
+    update_parameter_object, reversible_flux_pair_dict_generator,
+    tissue_specific_reversible_flux_title_constructor_generator,)
 from scripts.model.model_loader import ModelList, model_loader
 from scripts.data.data_loader import DataSource, common_data_loader
 

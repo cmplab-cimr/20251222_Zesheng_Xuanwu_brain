@@ -1,6 +1,6 @@
 from ..common.config import CoreConstants
 from ..common.packages import np, optimize, mp
-from ..common.functions import split_total_num_to_process, tqdm_daemon_process_func
+from ..common.functions import split_total_num_to_process, ProgressBarExtraProcess
 
 default_random_min_factor = CoreConstants.lp_random_min_factor
 default_random_max_factor = CoreConstants.lp_random_max_factor
@@ -237,7 +237,7 @@ def lp_parallel_sample(
         min_value_vector, max_value_vector, random_min_factor, random_max_factor, numeric_eps, parallel_test,
         display_progress_bar=False, name=None):
 
-    def parameter_list_generator(current_processes_num):
+    def parameter_list_generator(current_processes_num, send_pipe):
         for i in range(current_processes_num):
             this_process_target_size = each_process_size_list[i]
             bound_obj_start = i * each_process_valid_bound_num
@@ -262,59 +262,51 @@ def lp_parallel_sample(
     max_iter_num = 100
     iter_count = 0
 
-    send_pipe = None
-    new_daemon_process = None
-    if display_progress_bar:
-        if name is not None:
-            display_title = f'Initial solution generation for {name}'
-        else:
-            display_title = 'Initial solution generation'
-        (receive_pipe, send_pipe) = mp.Pipe()
-        new_daemon_process = mp.Process(
-            target=tqdm_daemon_process_func, args=(receive_pipe, target_size, display_title))
-        new_daemon_process.start()
+    if name is not None:
+        display_title = f'Initial solution generation for {name}'
+    else:
+        display_title = 'Initial solution generation'
 
-    # print(f'Computation started')
-    while current_target_size > 0 and iter_count < max_iter_num:
-        if current_target_size <= each_process_minimal_num:
-            parallel_test = True
-            current_processes_num = 1
-        elif current_target_size <= each_process_minimal_num * processes_num:
-            current_processes_num = current_target_size // each_process_minimal_num
-        else:
-            current_processes_num = processes_num
+    with ProgressBarExtraProcess(
+        display_progress_bar=display_progress_bar, target_size=target_size, display_title=display_title
+    ) as progress_bar:
 
-        each_process_size_list = split_total_num_to_process(current_target_size, current_processes_num)
-        finished_num = 0
-        each_process_valid_bound_num = each_process_size_list[0] * 2
-        valid_bound_num = each_process_valid_bound_num * current_processes_num
-        bounds, obj_array = generate_valid_lb_ub_bounds_and_obj(
-            valid_bound_num, variable_num, min_value_vector, max_value_vector, random_min_factor, random_max_factor,
-            random_seed)
-        parameter_list_iter = parameter_list_generator(current_processes_num)
+        # print(f'Computation started')
+        while current_target_size > 0 and iter_count < max_iter_num:
+            if current_target_size <= each_process_minimal_num:
+                parallel_test = True
+                current_processes_num = 1
+            elif current_target_size <= each_process_minimal_num * processes_num:
+                current_processes_num = current_target_size // each_process_minimal_num
+            else:
+                current_processes_num = processes_num
 
-        # print(f'Computation in cycle {iter_count} started')
-        if parallel_test:
-            for parameter_list in parameter_list_iter:
-                raw_result = lp_single_sample(parameter_list)
-                finished_num += process_result(raw_result)
-        else:
-            with mp.Pool(processes=current_processes_num) as pool:
-                raw_result_iter = pool.imap(lp_single_sample, parameter_list_iter)
-                for raw_result in raw_result_iter:
+            each_process_size_list = split_total_num_to_process(current_target_size, current_processes_num)
+            finished_num = 0
+            each_process_valid_bound_num = each_process_size_list[0] * 2
+            valid_bound_num = each_process_valid_bound_num * current_processes_num
+            bounds, obj_array = generate_valid_lb_ub_bounds_and_obj(
+                valid_bound_num, variable_num, min_value_vector, max_value_vector, random_min_factor, random_max_factor,
+                random_seed)
+            parameter_list_iter = parameter_list_generator(current_processes_num, progress_bar.send_pipe)
+
+            # print(f'Computation in cycle {iter_count} started')
+            if parallel_test:
+                for parameter_list in parameter_list_iter:
+                    raw_result = lp_single_sample(parameter_list)
                     finished_num += process_result(raw_result)
+            else:
+                with mp.Pool(processes=current_processes_num) as pool:
+                    raw_result_iter = pool.imap(lp_single_sample, parameter_list_iter)
+                    for raw_result in raw_result_iter:
+                        finished_num += process_result(raw_result)
 
-        current_target_size -= finished_num
-        iter_count += 1
-        # print(f'Cycle {iter_count} finished')
+            current_target_size -= finished_num
+            iter_count += 1
+            # print(f'Cycle {iter_count} finished')
 
     # print(f'Sample finished')
     # exit(0)
-
-    if display_progress_bar:
-        send_pipe.send(-1)
-        new_daemon_process.join()
-        new_daemon_process.close()
 
     if current_target_size > 0:
         return None

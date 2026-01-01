@@ -523,39 +523,38 @@ def inequality_bound_matrix_simplification(
     return valid_bound_coefficient_matrix, valid_min_bound_vector, valid_max_bound_vector
 
 
-def smaller_eq_bound_matrix_simplification(
-        complete_smaller_eq_matrix, transform_matrix, complete_smaller_eq_right_side_vector, computation_eps):
-    def check_if_exist_and_update_min_max_bound(coefficient_array, new_smaller_eq_value):
-        indexing_str = indexing_key_generator(coefficient_array, computation_eps)
-        if indexing_str not in existing_coefficient_dict:
-            existing_coefficient_dict[indexing_str] = new_smaller_eq_value
-            existence = False
-        else:
-            current_smaller_eq_value = existing_coefficient_dict[indexing_str]
-            existing_coefficient_dict[indexing_str] = min(
-                current_smaller_eq_value, new_smaller_eq_value)
-            existence = True
-        return existence, indexing_str
-
-    eps = 1e-12
-    final_row_list = []
-    final_indexing_str_list = []
-    final_smaller_eq_right_side_list = []
-    existing_coefficient_dict = {}
-    raw_transformed_smaller_eq_matrix = (complete_smaller_eq_matrix @ transform_matrix)
-    for row_index, each_row_array in enumerate(raw_transformed_smaller_eq_matrix):
-        if sum(abs(each_row_array)) < eps:
-            continue
-        existence, indexing_str = check_if_exist_and_update_min_max_bound(
-            each_row_array, complete_smaller_eq_right_side_vector[row_index])
-        if not existence:
-            final_row_list.append(row_index)
-            final_indexing_str_list.append(indexing_str)
-    for indexing_str in final_indexing_str_list:
-        smaller_eq_value = existing_coefficient_dict[indexing_str]
-        final_smaller_eq_right_side_list.append(smaller_eq_value)
-    valid_smaller_eq_matrix = complete_smaller_eq_matrix[final_row_list, :]
-    valid_transformed_smaller_eq_matrix = raw_transformed_smaller_eq_matrix[final_row_list, :]
-    valid_smaller_eq_right_side_array = np.array(final_smaller_eq_right_side_list)
-    # assert np.linalg.matrix_rank(valid_transformed_smaller_eq_matrix, eps) == valid_transformed_smaller_eq_matrix.shape[0]
-    return valid_smaller_eq_matrix, valid_transformed_smaller_eq_matrix, valid_smaller_eq_right_side_array
+# def smaller_eq_bound_matrix_simplification(
+#         complete_smaller_eq_matrix, transform_matrix, complete_smaller_eq_right_side_vector, computation_eps):
+#     def check_if_exist_and_update_min_max_bound(coefficient_array, new_smaller_eq_value):
+#         indexing_str = indexing_key_generator(coefficient_array, computation_eps)
+#         if indexing_str not in existing_coefficient_dict:
+#             existing_coefficient_dict[indexing_str] = new_smaller_eq_value
+#             existence = False
+#         else:
+#             current_smaller_eq_value = existing_coefficient_dict[indexing_str]
+#             existing_coefficient_dict[indexing_str] = min(
+#                 current_smaller_eq_value, new_smaller_eq_value)
+#             existence = True
+#         return existence, indexing_str
+#
+#     eps = 1e-12
+#     final_row_list = []
+#     final_indexing_str_list = []
+#     final_smaller_eq_right_side_list = []
+#     existing_coefficient_dict = {}
+#     raw_transformed_smaller_eq_matrix = (complete_smaller_eq_matrix @ transform_matrix)
+#     for row_index, each_row_array in enumerate(raw_transformed_smaller_eq_matrix):
+#         if sum(abs(each_row_array)) < eps:
+#             continue
+#         existence, indexing_str = check_if_exist_and_update_min_max_bound(
+#             each_row_array, complete_smaller_eq_right_side_vector[row_index])
+#         if not existence:
+#             final_row_list.append(row_index)
+#             final_indexing_str_list.append(indexing_str)
+#     for indexing_str in final_indexing_str_list:
+#         smaller_eq_value = existing_coefficient_dict[indexing_str]
+#         final_smaller_eq_right_side_list.append(smaller_eq_value)
+#     valid_smaller_eq_matrix = complete_smaller_eq_matrix[final_row_list, :]
+#     valid_transformed_smaller_eq_matrix = raw_transformed_smaller_eq_matrix[final_row_list, :]
+#     valid_smaller_eq_right_side_array = np.array(final_smaller_eq_right_side_list)
+#     return valid_smaller_eq_matrix, valid_transformed_smaller_eq_matrix, valid_smaller_eq_right_side_array

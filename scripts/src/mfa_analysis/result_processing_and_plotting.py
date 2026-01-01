@@ -19,38 +19,43 @@ class FinalResult(GeneralFinalResult):
         self.mid_name_tissue_name_dict = {}
         self.flux_name_tissue_name_dict = {}
         self.predicted_data_figure = predicted_data_figure
+        self.mix_prefix = f'{CoreConstants.mix_ratio_prefix}{CoreConstants.mix_flux_sep}'
 
-    def iteration(self, raw_result_label, process_mid_name=True, result_label_suffix_tuple=()):
+    def mid_name_process(self, raw_mid_name):
+        modified_mid_name = mid_name_process(raw_mid_name)
+        tissue_name, pure_mid_name = tissue_name_breakdown(modified_mid_name)
+        if raw_mid_name not in self.mid_name_tissue_name_dict:
+            self.mid_name_tissue_name_dict[raw_mid_name] = (tissue_name, pure_mid_name)
+        return modified_mid_name
+
+    def flux_name_process(self, complete_flux_name):
+        mix_flux = check_if_mix_flux(complete_flux_name)
+        if mix_flux:
+            tissue_name, raw_flux_name = tissue_name_breakdown(complete_flux_name[len(self.mix_prefix):])
+            raw_flux_name = f'{self.mix_prefix}{raw_flux_name}'
+        else:
+            tissue_name, raw_flux_name = tissue_name_breakdown(complete_flux_name)
+        if complete_flux_name not in self.flux_name_tissue_name_dict:
+            self.flux_name_tissue_name_dict[complete_flux_name] = (tissue_name, raw_flux_name)
+        return tissue_name, raw_flux_name
+
+    def target_mid_name_process(self, raw_target_mid_name):
+        # new_target_mid_data_dict = {}
+        # for raw_mid_name, mid_data_value in target_mid_data_dict.items():
+        #     new_mid_name = raw_mid_name.replace(f'{CoreConstants.mix_ratio_prefix}(', '')
+        #     new_mid_name = new_mid_name.replace(f'{CoreConstants.convolution_id}(', '')
+        #     new_mid_name = new_mid_name.replace(f')', '')
+        #     new_target_mid_data_dict[new_mid_name] = mid_data_value
+        # return new_target_mid_data_dict
+        new_target_mid_name = raw_target_mid_name.replace(f'{CoreConstants.mix_ratio_prefix}(', '')
+        new_target_mid_name = new_target_mid_name.replace(f'{CoreConstants.convolution_id}(', '')
+        new_target_mid_name = new_target_mid_name.replace(f')', '')
+        modified_target_mid_name = self.mid_name_process(new_target_mid_name)
+        return modified_target_mid_name
+
+    def iteration(self, raw_result_label, process_mid_name=True, result_label_suffix_tuple=(), solver_obj=None):
         emu_sep = CoreConstants.emu_carbon_list_str_sep
         tissue_sep = CoreConstants.specific_tissue_sep
-        mix_prefix = f'{CoreConstants.mix_ratio_prefix}{CoreConstants.mix_flux_sep}'
-
-        def mid_name_and_tissue_process(raw_mid_name):
-            modified_mid_name = mid_name_process(raw_mid_name)
-            tissue_name, pure_mid_name = tissue_name_breakdown(modified_mid_name)
-            if raw_mid_name not in self.mid_name_tissue_name_dict:
-                self.mid_name_tissue_name_dict[raw_mid_name] = (tissue_name, pure_mid_name)
-            return raw_mid_name
-
-        def flux_name_process(flux_name):
-            mix_flux = check_if_mix_flux(flux_name)
-            if mix_flux:
-                tissue_name, raw_flux_name = tissue_name_breakdown(flux_name[len(mix_prefix):])
-                raw_flux_name = f'{mix_prefix}{raw_flux_name}'
-            else:
-                tissue_name, raw_flux_name = tissue_name_breakdown(flux_name)
-            if flux_name not in self.flux_name_tissue_name_dict:
-                self.flux_name_tissue_name_dict[flux_name] = (tissue_name, raw_flux_name)
-            return tissue_name, raw_flux_name
-
-        def target_mid_name_process(target_mid_data_dict):
-            new_target_mid_data_dict = {}
-            for raw_mid_name, mid_data_value in target_mid_data_dict.items():
-                new_mid_name = raw_mid_name.replace(f'{CoreConstants.mix_ratio_prefix}(', '')
-                new_mid_name = new_mid_name.replace(f'{CoreConstants.convolution_id}(', '')
-                new_mid_name = new_mid_name.replace(f')', '')
-                new_target_mid_data_dict[new_mid_name] = mid_data_value
-            return new_target_mid_data_dict
 
         tissue_name_replacement_pair_list = [
             ('sub_q_fat', 'white_adipose'),
@@ -59,13 +64,10 @@ class FinalResult(GeneralFinalResult):
         (
             loss_array, solution_array, flux_name_index_dict, raw_result_information_dict, predicted_data_dict,
             raw_target_experimental_mid_data_dict, time_array
-        ) = super().iteration(raw_result_label, process_mid_name, result_label_suffix_tuple)
+        ) = super(FinalResult, self).iteration(
+            raw_result_label, process_mid_name, result_label_suffix_tuple, solver_obj=solver_obj)
         result_information_dict = {**raw_result_information_dict}
-        for complicated_flux_name in flux_name_index_dict.keys():
-            flux_name_process(complicated_flux_name)
-        for mid_name, mid_value in predicted_data_dict.items():
-            mid_name_and_tissue_process(mid_name)
-        target_experimental_mid_data_dict = target_mid_name_process(raw_target_experimental_mid_data_dict)
+        target_experimental_mid_data_dict = {**raw_target_experimental_mid_data_dict}
 
         return loss_array, solution_array, flux_name_index_dict, result_information_dict, predicted_data_dict, \
             target_experimental_mid_data_dict, time_array
@@ -104,7 +106,9 @@ def result_final_process(
         benchmark=False, average_optimized_results=None, loss_percentile=None,
         result_label_suffix_tuple=(), parallel_num=None, **other_param_dict):
     for current_result_label in solver_dict.keys():
-        final_result_obj.load_current_result_label(current_result_label, result_label_suffix_tuple)
+        solver_obj = solver_dict[current_result_label]
+        final_result_obj.load_current_result_label(
+            current_result_label, result_label_suffix_tuple, solver_obj=solver_obj)
 
     final_solution_data_dict = final_result_obj.final_solution_data_dict
     final_loss_data_dict = final_result_obj.final_loss_data_dict
@@ -116,10 +120,6 @@ def result_final_process(
     final_solution_id_array_dict = final_result_obj.final_solution_id_array_dict
     mid_name_tissue_name_dict = final_result_obj.mid_name_tissue_name_dict
     final_information_dict = final_result_obj.final_information_dict
-
-    repair_predicted_mid(
-        final_result_obj, solver_dict, final_solution_data_dict, final_predicted_data_dict,
-        final_target_experimental_mid_data_dict, final_solution_id_array_dict)
 
     if average_optimized_results is not None:
         (
@@ -170,59 +170,6 @@ def result_final_process(
     output_predicted_mid_data(
         final_result_obj.mid_prediction_result_output_xlsx_path, final_loss_data_dict, final_predicted_data_dict,
         final_target_experimental_mid_data_dict, final_information_dict, subset_index_dict=subset_index_dict)
-
-
-def repair_predicted_mid(
-        final_result_obj, solver_dict, final_solution_data_dict, final_predicted_data_dict,
-        final_target_experimental_mid_data_dict, final_solution_id_array_dict):
-    regenerate_predicted_mid = False
-    save_new_result_obj = False
-    resaved_predicted_mid_dict = {}
-    for current_result_label in solver_dict.keys():
-        current_solution_num = final_solution_data_dict[current_result_label].shape[0]
-        if current_solution_num == 0:
-            continue
-        current_target_experimental_mid_data_dict = final_target_experimental_mid_data_dict[current_result_label]
-        existing_predicted_data_num = 0
-        if current_result_label not in final_predicted_data_dict:
-            regenerate_predicted_mid = True
-            current_predicted_data_dict = {}
-        else:
-            current_predicted_data_dict = final_predicted_data_dict[current_result_label]
-            for mid_name, mid_array_list in current_predicted_data_dict.items():
-                if existing_predicted_data_num == 0:
-                    existing_predicted_data_num = len(mid_array_list)
-                else:
-                    assert existing_predicted_data_num == len(mid_array_list)
-            if existing_predicted_data_num < current_solution_num:
-                regenerate_predicted_mid = True
-        if regenerate_predicted_mid:
-            print(f'Generating predicted MID for {current_solution_num - existing_predicted_data_num} '
-                  f'solutions in data set {current_result_label}')
-            save_new_result_obj = True
-            current_solver = solver_dict[current_result_label]
-            current_solution_array = final_solution_data_dict[current_result_label]
-            for solution_vector in current_solution_array[existing_predicted_data_num:]:
-                this_solution_predicted_data_dict = current_solver.predict(solution_vector)
-                for raw_mid_name, mid_array in this_solution_predicted_data_dict.items():
-                    mid_name = mid_name_process(raw_mid_name)
-                    if mid_name not in current_target_experimental_mid_data_dict:
-                        continue
-                    if mid_name not in current_predicted_data_dict:
-                        current_predicted_data_dict[mid_name] = []
-                    current_predicted_data_dict[mid_name].append(mid_array)
-            for mid_name, each_mid_data_array in current_predicted_data_dict.items():
-                assert len(each_mid_data_array) == current_solution_num
-            resaved_predicted_mid_dict[current_result_label] = current_solution_num
-            final_predicted_data_dict[current_result_label] = current_predicted_data_dict
-    if save_new_result_obj:
-        final_result_obj.resave_all_content()
-        if len(resaved_predicted_mid_dict) > 0:
-            resaved_mid_report_str = ' '.join([
-                f'{result_label}: {solution_num}  '
-                for result_label, solution_num in resaved_predicted_mid_dict.items()])
-            print(f'Append predicted MID to target solution num for following data set:\n{resaved_mid_report_str}')
-        print()
 
 
 def multi_tissue_experimental_mid_prediction(

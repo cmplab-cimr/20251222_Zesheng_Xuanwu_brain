@@ -1,10 +1,10 @@
 from .packages import np, mp, it, threadpool_limits
 from .config import (
     Keywords, random_seed, specific_solver_constructor, base_solver_constructor,
-    parameter_extract, split_total_num_to_process)
+    parameter_extract, split_total_num_to_process, ProgressBarExtraProcess)
 
 from ..core.common.functions import (
-    compartmental_mid_name_constructor, mid_name_process, tqdm_daemon_process_func)
+    compartmental_mid_name_constructor, mid_name_process)
 from ..core.solver.slsqp_numba_solver.solver_class import SLSQPNumbaSolver
 
 
@@ -58,7 +58,7 @@ def parallel_single_predictor(parameter_list):
 
 def common_parallel_predictor(
         parameter_list_iter, total_solver_num, processes_num=6, parallel_test=False, predict_all_mid=False,
-        new_daemon_process=None, send_pipe=None, **other_parameters):
+        **other_parameters):
     def process_result(current_raw_result):
         (
             solver_index, raw_predicted_data_dict_list, raw_all_predicted_data_dict_list) = current_raw_result
@@ -69,9 +69,6 @@ def common_parallel_predictor(
     folded_raw_predicted_data_dict_nested_list = [[] for _ in range(total_solver_num)]
     folded_raw_all_predicted_data_dict_nested_list = [[] for _ in range(total_solver_num)]
 
-    if new_daemon_process is not None:
-        new_daemon_process.start()
-
     if parallel_test:
         for parameter_list in parameter_list_iter:
             raw_result = parallel_single_predictor(parameter_list)
@@ -81,9 +78,6 @@ def common_parallel_predictor(
             raw_result_iter = pool.imap(parallel_single_predictor, parameter_list_iter)
             for raw_result in raw_result_iter:
                 process_result(raw_result)
-
-    if send_pipe is not None:
-        send_pipe.send(-1)
 
     all_final_raw_predicted_mid_data_dict_list = []
     for folded_raw_predicted_data_dict_list in folded_raw_predicted_data_dict_nested_list:
@@ -113,16 +107,11 @@ def common_parallel_predictor(
             for raw_mid_name, mid_data_array_list in raw_list_all_predicted_mid_data_dict.items()}
         all_final_raw_all_predicted_mid_data_dict_list.append(final_raw_all_predicted_mid_data_dict)
 
-    if new_daemon_process is not None:
-        new_daemon_process.join()
-        new_daemon_process.close()
-
     return all_final_raw_predicted_mid_data_dict_list, all_final_raw_all_predicted_mid_data_dict_list
 
 
 def base_solver_obj_generator(
-        flux_vector_array_list, mfa_tuple_list, slsqp_solver_obj_list, processes_num, parallel_test,
-        display_progress_bar, name):
+        flux_vector_array_list, mfa_tuple_list, slsqp_solver_obj_list, processes_num, parallel_test):
     total_solver_num = len(flux_vector_array_list)
     base_solver_obj_for_parallel_list = []
     mfa_solver_option_dict_list = []
@@ -151,20 +140,9 @@ def base_solver_obj_generator(
         flux_vector_index_num_nested_list.append(current_flux_vector_index_num_list)
     updated_parallel_test = parallel_test or total_flux_size < 5
 
-    send_pipe = None
-    new_daemon_process = None
-    if display_progress_bar:
-        if name is not None:
-            display_title = f'MID prediction for {name}'
-        else:
-            display_title = 'MID prediction'
-        (receive_pipe, send_pipe) = mp.Pipe()
-        new_daemon_process = mp.Process(
-            target=tqdm_daemon_process_func, args=(receive_pipe, total_flux_size, display_title))
-
     return (
         base_solver_obj_for_parallel_list, mfa_solver_option_dict_list, total_solver_num, total_flux_size,
-        updated_parallel_test, flux_vector_index_num_nested_list, new_daemon_process, send_pipe)
+        updated_parallel_test, flux_vector_index_num_nested_list)
 
 
 def multi_solver_parallel_predictor(
@@ -173,17 +151,24 @@ def multi_solver_parallel_predictor(
     thread_num_constraint = max(4, int(24 / processes_num))
     (
         base_solver_obj_for_parallel_list, mfa_solver_option_dict_list, total_solver_num, total_size,
-        updated_parallel_test, flux_vector_index_num_nested_list, new_daemon_process, send_pipe
+        updated_parallel_test, flux_vector_index_num_nested_list,
      ) = base_solver_obj_generator(
-        flux_vector_array_list, mfa_tuple_list, slsqp_solver_obj_list, processes_num, parallel_test,
-        display_progress_bar, name)
-    parameter_list_iter = parallel_parameter_generator(
-        flux_vector_array_list, base_solver_obj_for_parallel_list, mfa_solver_option_dict_list,
-        flux_vector_index_num_nested_list, thread_num_constraint=thread_num_constraint,
-        predict_all_mid=predict_all_mid, send_pipe=send_pipe)
-    all_final_raw_predicted_mid_data_dict_list, all_final_raw_all_predicted_mid_data_dict_list = common_parallel_predictor(
-        parameter_list_iter, total_solver_num=total_solver_num, processes_num=processes_num,
-        parallel_test=updated_parallel_test, predict_all_mid=predict_all_mid,
-        new_daemon_process=new_daemon_process, send_pipe=send_pipe, )
+        flux_vector_array_list, mfa_tuple_list, slsqp_solver_obj_list, processes_num, parallel_test)
+    if name is not None:
+        display_title = f'MID prediction for {name}'
+    else:
+        display_title = 'MID prediction'
+    with ProgressBarExtraProcess(
+            display_progress_bar=display_progress_bar, target_size=total_size, display_title=display_title,
+    ) as progress_bar:
+        parameter_list_iter = parallel_parameter_generator(
+            flux_vector_array_list, base_solver_obj_for_parallel_list, mfa_solver_option_dict_list,
+            flux_vector_index_num_nested_list, thread_num_constraint=thread_num_constraint,
+            predict_all_mid=predict_all_mid, send_pipe=progress_bar.send_pipe)
+        (
+            all_final_raw_predicted_mid_data_dict_list, all_final_raw_all_predicted_mid_data_dict_list
+        ) = common_parallel_predictor(
+            parameter_list_iter, total_solver_num=total_solver_num, processes_num=processes_num,
+            parallel_test=updated_parallel_test, predict_all_mid=predict_all_mid,)
     return all_final_raw_predicted_mid_data_dict_list, all_final_raw_all_predicted_mid_data_dict_list
 

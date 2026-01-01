@@ -8,6 +8,8 @@ from ..base_class import default_random_min_factor, default_random_max_factor, \
 from .common_sampler_functions import calculate_direction_range, check_new_location, \
     random_direction_pool_generator
 
+rand_rng = np.random.default_rng(4536251)
+
 
 class ParallelHRSampler(BaseSampler):
     """The abstract base class for hit-and-run samplers.
@@ -58,7 +60,7 @@ class ParallelHRSampler(BaseSampler):
             self.min_value_vector, self.max_value_vector, self.numeric_eps)
 
     def sample(self, n=1, parallel_test=False, display_progress_bar=True):
-        parallel_sample(
+        return parallel_sample(
             self.lp_sampler, n,
             self.valid_smaller_eq_matrix, self.valid_transformed_smaller_eq_matrix,
             self.valid_smaller_eq_right_side_vector,
@@ -67,7 +69,6 @@ class ParallelHRSampler(BaseSampler):
             self.numeric_eps, self.normal_a_min, self.normal_a_max,
             parallel_test=parallel_test, display_progress_bar=display_progress_bar,
         )
-
 
 
 def initialize_equality_inequality_constraints(
@@ -91,7 +92,7 @@ def initialize_equality_inequality_constraints(
 
     """
     from ...solver.solver_construction_functions.common_construct_functions import (
-        constraint_matrix_verification_and_simplification, smaller_eq_bound_matrix_simplification)
+        constraint_matrix_verification_and_simplification)
 
     (
         valid_constraint_matrix, valid_right_side_array, valid_constraint_num
@@ -119,42 +120,43 @@ def initialize_equality_inequality_constraints(
     valid_flux_constraint_matrix_q = valid_flux_constraint_matrix_q_t.T
     complete_smaller_eq_matrix = np.vstack(complete_smaller_eq_matrix_list)
     complete_smaller_eq_right_side_vector = np.concatenate(complete_smaller_eq_right_side_list)
-    (
-        valid_smaller_eq_matrix, valid_transformed_smaller_eq_matrix, valid_smaller_eq_right_side_array
-    ) = smaller_eq_bound_matrix_simplification(
-        complete_smaller_eq_matrix, valid_flux_constraint_matrix_q_t, complete_smaller_eq_right_side_vector, computation_eps)
+    transformed_smaller_eq_matrix = (complete_smaller_eq_matrix @ valid_flux_constraint_matrix_q_t)
+    # (
+    #     valid_smaller_eq_matrix, valid_transformed_smaller_eq_matrix, valid_smaller_eq_right_side_array
+    # ) = smaller_eq_bound_matrix_simplification(
+    #     complete_smaller_eq_matrix, valid_flux_constraint_matrix_q_t, complete_smaller_eq_right_side_vector, computation_eps)
     return (
-        valid_smaller_eq_matrix, valid_transformed_smaller_eq_matrix, valid_smaller_eq_right_side_array,
+        complete_smaller_eq_matrix, transformed_smaller_eq_matrix, complete_smaller_eq_right_side_vector,
         valid_flux_constraint_matrix_q, free_flux_num)
 
 
 def single_vector_sample(parameter_list):
 
-    def find_max_ratio(y_matrix, p_matrix, matrix_c, right_side_matrix_d):
+    def find_max_ratio(y_matrix, p_matrix, matrix_c_t, right_side_matrix_d):
         """
         C' @ (y + a * p) <= d'
 
         a * (C @ p) <= d - C @ y
         """
-        delta_d = right_side_matrix_d - matrix_c @ y_matrix
-        projected_p = matrix_c @ p_matrix
-        raw_a_matrix = delta_d / (projected_p + 2.345678e-7)
+        delta_d = right_side_matrix_d - y_matrix @ matrix_c_t
+        projected_p = p_matrix @ matrix_c_t
+        raw_a_matrix = delta_d / (projected_p + 0.532718273 * computation_eps)
         raw_a_matrix[raw_a_matrix < 0] = 9e10
         raw_a_matrix[raw_a_matrix < computation_eps] = computation_eps
-        each_max_a_max = np.min(raw_a_matrix, axis=0, keepdims=True)
+        each_max_a_max = np.min(raw_a_matrix, axis=1, keepdims=True)
         return each_max_a_max
 
     (
         complete_initial_solution_array, complete_smaller_eq_right_side_array,
-        target_size, smaller_eq_matrix, transformed_smaller_eq_matrix, smaller_eq_right_side_vector,
+        target_size, transformed_smaller_eq_matrix_t, smaller_eq_right_side_vector,
         valid_flux_constraint_matrix_q,
         batch_size, free_flux_num, thinning, normal_a_min, normal_a_max, computation_eps, send_pipe
     ) = parameter_list
 
-    rand_rng = np.random.default_rng(4536251)
     max_continuous_invalid_step = 20
     max_valid_step = 100000
     minimal_step_norm = 1e-5
+    max_a_ratio = 0.8
     valid_step_count = np.zeros(batch_size, dtype=int)
     continuous_invalid_step_count = np.zeros(batch_size, dtype=int)
     selected_solution = np.zeros(batch_size, dtype=bool)
@@ -176,14 +178,15 @@ def single_vector_sample(parameter_list):
 
         each_free_flux_max_a_max = find_max_ratio(
             current_free_flux_array, random_free_direction_vector,
-            transformed_smaller_eq_matrix, current_smaller_eq_right_side_array)
+            transformed_smaller_eq_matrix_t, current_smaller_eq_right_side_array)
+        real_each_free_flux_max_a_max = each_free_flux_max_a_max * max_a_ratio
 
-        each_free_flux_a_min = np.minimum(normal_a_min, each_free_flux_max_a_max)
-        each_free_flux_a_max = np.minimum(normal_a_max, each_free_flux_max_a_max)
+        each_free_flux_a_min = np.minimum(normal_a_min, real_each_free_flux_max_a_max)
+        each_free_flux_a_max = np.minimum(normal_a_max, real_each_free_flux_max_a_max)
         each_free_flux_a = rand_rng.random([batch_size, 1]) * (each_free_flux_a_max - each_free_flux_a_min) + each_free_flux_a_min
 
         new_free_flux_array = current_free_flux_array + each_free_flux_a * random_free_direction_vector
-        delta_norm = np.linalg.norm((new_free_flux_array - current_free_flux_array), axis=1, keepdims=True)
+        delta_norm = np.linalg.norm((new_free_flux_array - current_free_flux_array), axis=1)
         current_step_valid_array = delta_norm > minimal_step_norm
 
         valid_step_count[current_step_valid_array] += 1
@@ -193,7 +196,7 @@ def single_vector_sample(parameter_list):
 
         success_array = (
             (valid_step_count > 0)
-            & (valid_step_count % thinning) == 0
+            & ((valid_step_count % thinning) == 0)
             & ~selected_solution)
         if np.any(success_array):
             success_free_flux = current_free_flux_array[success_array]
@@ -241,12 +244,14 @@ def parallel_sample(
         lp_sampler, target_size, smaller_eq_matrix, transformed_smaller_eq_matrix, smaller_eq_right_side_vector,
         valid_flux_constraint_matrix_q, processes_num,
         batch_size, free_flux_num, thinning, computation_eps, normal_a_min, normal_a_max,
-        parallel_test=False, display_progress_bar=True,
+        parallel_test=False, display_progress_bar=True, average_initial_num=3
 ):
     def generate_new_initial(required_initial_num):
         """Row-based solution"""
-        new_initial_solution_array = lp_sampler.parallel_sample(
+        raw_initial_solution_array = lp_sampler.parallel_sample(
             required_initial_num, processes_num=processes_num, parallel_test=parallel_test)
+        random_index = rand_rng.choice(required_initial_num, size=(required_initial_num, average_initial_num))
+        new_initial_solution_array = raw_initial_solution_array[random_index].mean(axis=1)
         new_smaller_eq_right_side_array = (
             np.reshape(smaller_eq_right_side_vector, [1, -1]) -
             (smaller_eq_matrix @ new_initial_solution_array.T).T)
@@ -258,6 +263,7 @@ def parallel_sample(
     def parameter_list_generator(_target_size, _batch_size, _process_num):
         each_initial_num = _batch_size * 2
         complete_initial_num = each_initial_num * _process_num
+        transformed_smaller_eq_matrix_t = transformed_smaller_eq_matrix.T
         each_process_size_list = split_total_num_to_process(_target_size, _process_num)
         (
             complete_initial_solution_array, complete_smaller_eq_right_side_array
@@ -270,14 +276,15 @@ def parallel_sample(
             current_smaller_eq_right_side_array = complete_smaller_eq_right_side_array[bound_obj_start:bound_obj_end]
             yield (
                 current_initial_solution_array, current_smaller_eq_right_side_array,
-                this_process_target_size, smaller_eq_matrix, transformed_smaller_eq_matrix, smaller_eq_right_side_vector,
+                this_process_target_size, transformed_smaller_eq_matrix_t, smaller_eq_right_side_vector,
                 valid_flux_constraint_matrix_q,
                 batch_size, free_flux_num, thinning, normal_a_min, normal_a_max, computation_eps, send_pipe)
 
     folded_flux_array_list = []
     with ProgressBarExtraProcess(
             display_progress_bar=display_progress_bar, target_size=target_size, display_title='Sampling'
-    ) as send_pipe:
+    ) as progress_bar:
+        send_pipe = progress_bar.send_pipe
         parameter_list_iter = parameter_list_generator(target_size, batch_size, processes_num)
         if parallel_test:
             for parameter_list in parameter_list_iter:

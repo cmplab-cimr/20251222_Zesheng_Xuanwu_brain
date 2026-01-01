@@ -31,6 +31,18 @@ def return_data_content(running_mode, dataset_id=None, **kwargs):
         (mfa_data_dict, data_content_1, data_content_2, mfa_information_dict, data_content_4) = data_content
         each_data_target_mfa_data_name_list_dict = {
             'ctrl_vs_sema': [
+                'glucose__ad__ctrl__1',
+                'glucose__ad__ctrl__2',
+                'glucose__ad__ctrl__3',
+                # 'glucose__ad__ctrl__4',
+                # 'glucose__ad__ctrl__5',
+                # 'glucose__ad__ctrl__6',
+                'glucose__ad__semaglutide__1',
+                'glucose__ad__semaglutide__2',
+                'glucose__ad__semaglutide__3',
+                # 'glucose__ad__semaglutide__4',
+                # 'glucose__ad__semaglutide__5',
+                # 'glucose__ad__semaglutide__6',
             ],
         }
         if dataset_id is None:
