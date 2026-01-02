@@ -1,5 +1,7 @@
 from .packages import np, gzip, pickle, pathlib
 
+from ..core.common.config import ParamName as CoreParamName
+from ..core.common.classes import OptionDict
 from ..core.common.functions import ProgressBarExtraProcess
 from ..core.solver.solver_construction_functions.solver_constructor import specific_solver_constructor, \
     base_solver_constructor, common_solver_constructor

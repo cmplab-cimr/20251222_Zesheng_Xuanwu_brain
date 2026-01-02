@@ -1,6 +1,6 @@
 from .packages import np, mp, it, threadpool_limits
 from .config import (
-    Keywords, random_seed, specific_solver_constructor, base_solver_constructor,
+    CoreParamName, OptionDict, Keywords, random_seed, specific_solver_constructor, base_solver_constructor,
     parameter_extract, split_total_num_to_process, ProgressBarExtraProcess)
 
 from ..core.common.functions import (
@@ -126,10 +126,21 @@ def base_solver_obj_generator(
     else:
         assert mfa_tuple_list is not None and len(mfa_tuple_list) == total_solver_num
         for mfa_model, mfa_data, mfa_config in mfa_tuple_list:
-            base_solver_obj_for_parallel = base_solver_constructor(mfa_model, mfa_data, mfa_config)
+            if mfa_config.solver_type != CoreParamName.slsqp_numba_python_solver:
+                new_mfa_config = mfa_config.copy()
+                new_mfa_config.solver_type = CoreParamName.slsqp_numba_python_solver
+                new_mfa_config.solver_config_dict = OptionDict({
+                    CoreParamName.loss_type: CoreParamName.mean_squared_loss,
+                    CoreParamName.debug: True,
+                    CoreParamName.slsqp_max_iter: 2000,
+                    CoreParamName.numba_nopython: False,
+                })
+            else:
+                new_mfa_config = mfa_config
+            base_solver_obj_for_parallel = base_solver_constructor(mfa_model, mfa_data, new_mfa_config)
             base_solver_obj_for_parallel.base_initialize_solver()
             base_solver_obj_for_parallel_list.append(base_solver_obj_for_parallel)
-            mfa_solver_option_dict_list.append(mfa_config.solver_config_dict)
+            mfa_solver_option_dict_list.append(new_mfa_config.solver_config_dict)
     flux_vector_index_num_nested_list = []
     total_flux_size = 0
     for flux_vector_array in flux_vector_array_list:

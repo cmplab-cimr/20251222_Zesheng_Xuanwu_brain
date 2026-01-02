@@ -250,8 +250,8 @@ def generate_unoptimized_solutions(
         slsqp_solver_obj.target_experimental_mid_data_dict, 0, each_case_target_optimization_num)
 
 
-def load_previous_results(result_label, final_result_obj, each_case_optimization_num):
-    loaded_num = final_result_obj.load_previous_results(result_label)
+def load_previous_results(result_label, final_result_obj, mfa_tuple, each_case_optimization_num):
+    loaded_num = final_result_obj.load_previous_results(result_label, mfa_tuple=mfa_tuple)
     assert each_case_optimization_num is not None
     if loaded_num >= each_case_optimization_num:
         new_optimization_num = 0
@@ -454,7 +454,7 @@ def solver_and_solution_list_construct(
             predefined_solution_flux_matrix = None
         if load_results:
             new_optimization_num = load_previous_results(
-                result_label, final_result_obj, this_case_target_optimization_num)
+                result_label, final_result_obj, (mfa_model, mfa_data, mfa_config), this_case_target_optimization_num)
         else:
             new_optimization_num = this_case_target_optimization_num
         if new_optimization_num == 0:

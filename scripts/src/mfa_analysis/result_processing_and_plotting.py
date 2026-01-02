@@ -97,8 +97,8 @@ class OutOfOrderFinalResult(FinalResult):
             self.final_predicted_data_dict[result_label], current_result_information,
             flux_name_index_dict, target_experimental_mid_data_dict, self.final_solution_id_array_dict[result_label])
 
-    def load_previous_results(self, raw_result_label):
-        return self._load_previous_results(raw_result_label, out_of_order=True)
+    def load_previous_results(self, raw_result_label, mfa_tuple=None):
+        return self._load_previous_results(raw_result_label, out_of_order=True, mfa_tuple=mfa_tuple)
 
 
 def result_final_process(

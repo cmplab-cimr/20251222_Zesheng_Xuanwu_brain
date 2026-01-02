@@ -388,7 +388,7 @@ class FinalResult(object):
             if predicted_mid_num < solution_num:
                 self._generate_predicted_mid_data_dict(
                     solution_num, predicted_mid_num, result_label,
-                    tmp_solution_array, solver_obj, predicted_data_dict, target_experimental_mid_data_dict,
+                    tmp_solution_array, solver_obj, None, predicted_data_dict, target_experimental_mid_data_dict,
                     process_mid_name=True)
                 pickle_save(predicted_data_dict, predicted_dict_path)
 
@@ -438,7 +438,8 @@ class FinalResult(object):
             self.final_time_data_dict[result_label]
         ) = self.iteration(result_label, result_label_suffix_tuple=result_label_suffix_tuple, solver_obj=solver_obj)
 
-    def _load_previous_results(self, raw_result_label, out_of_order=False):
+    def _load_previous_results(self, raw_result_label, out_of_order=False, mfa_tuple=None):
+        # TODO: Combine this with iteration. They have similar functions
         result_label = self._update_result_label(raw_result_label)
         (
             solution_array_path, time_array_path, loss_array_path, predicted_dict_path, information_path,
@@ -454,6 +455,29 @@ class FinalResult(object):
             warnings.warn('Cannot find any previous data with label: {}'.format(result_label))
             return 0
         else:
+            """Predict MID"""
+            solution_num = solution_array.shape[0]
+            predicted_mid_num = 0
+            for mid_name, mid_value in raw_predicted_dict.items():
+                this_mid_num = len(mid_value)
+                if predicted_mid_num == 0:
+                    predicted_mid_num = this_mid_num
+                else:
+                    assert predicted_mid_num == this_mid_num
+            target_experimental_mid_data_dict = {}
+            for raw_mid_name, experimental_mid_data in raw_target_experimental_mid_data_dict.items():
+                processed_mid_name = self.target_mid_name_process(raw_mid_name)
+                if processed_mid_name not in target_experimental_mid_data_dict:
+                    target_experimental_mid_data_dict[processed_mid_name] = experimental_mid_data
+                else:
+                    assert np.all(experimental_mid_data == target_experimental_mid_data_dict[processed_mid_name])
+            if predicted_mid_num < solution_num:
+                self._generate_predicted_mid_data_dict(
+                    solution_num, predicted_mid_num, result_label,
+                    solution_array, None, mfa_tuple, raw_predicted_dict, target_experimental_mid_data_dict,
+                    process_mid_name=True)
+                pickle_save(raw_predicted_dict, predicted_dict_path)
+
             solution_id_array = None
             try:
                 solution_id_array = self._load_solution_id(solution_id_array_path)
@@ -473,8 +497,8 @@ class FinalResult(object):
                         flux_name_index_dict, raw_target_experimental_mid_data_dict, solution_id_array)
             return self.data_count_dict[result_label]
 
-    def load_previous_results(self, raw_result_label):
-        return self._load_previous_results(raw_result_label)
+    def load_previous_results(self, raw_result_label, mfa_tuple=None):
+        return self._load_previous_results(raw_result_label, mfa_tuple=mfa_tuple)
 
     def repair_predicted_mid_dict_and_merge(self, solver_dict):
         for result_label, solver_obj in solver_dict.items():
@@ -586,14 +610,22 @@ class FinalResult(object):
 
     def _generate_predicted_mid_data_dict(
             self, complete_solution_num, current_predicted_data_num, current_result_label, complete_solution_array,
-            current_solver, current_predicted_data_dict, current_target_experimental_mid_data_dict,
+            current_solver, current_mfa_tuple, current_predicted_data_dict, current_target_experimental_mid_data_dict,
             process_mid_name):
         from .common_parallel_predictor import multi_solver_parallel_predictor
         print(f'Generating predicted MID for {complete_solution_num - current_predicted_data_num} '
               f'solutions in data set {current_result_label}')
+        if current_solver is not None:
+            mfa_tuple_list = None
+            slsqp_solver_obj_list = [current_solver]
+        elif current_mfa_tuple is not None:
+            mfa_tuple_list = [current_mfa_tuple]
+            slsqp_solver_obj_list = None
+        else:
+            raise ValueError()
         this_solution_raw_predicted_mid_data_dict_list, _ = multi_solver_parallel_predictor(
             [complete_solution_array[current_predicted_data_num:]],
-            slsqp_solver_obj_list=[current_solver],
+            mfa_tuple_list=mfa_tuple_list, slsqp_solver_obj_list=slsqp_solver_obj_list,
             processes_num=12, predict_all_mid=False, parallel_test=False, display_progress_bar=True,
             name=current_result_label)
         all_solution_raw_predicted_mid_data_dict = this_solution_raw_predicted_mid_data_dict_list[0]
@@ -605,8 +637,15 @@ class FinalResult(object):
             if processed_mid_name not in current_target_experimental_mid_data_dict:
                 continue
             if processed_mid_name not in current_predicted_data_dict:
-                current_predicted_data_dict[processed_mid_name] = []
-            current_predicted_data_dict[processed_mid_name].extend(all_mid_array)
+                current_predicted_data_dict[processed_mid_name] = all_mid_array
+            else:
+                current_content = current_predicted_data_dict[processed_mid_name]
+                if isinstance(current_content, np.ndarray):
+                    current_predicted_data_dict[processed_mid_name] = np.vstack([current_content, all_mid_array])
+                elif isinstance(current_content, list):
+                    current_predicted_data_dict[processed_mid_name].extend(all_mid_array)
+                else:
+                    raise ValueError()
 
         for mid_name, each_mid_data_array in current_predicted_data_dict.items():
             assert len(each_mid_data_array) == complete_solution_num
