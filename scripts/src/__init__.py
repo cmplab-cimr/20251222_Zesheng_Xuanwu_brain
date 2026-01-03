@@ -1,0 +1,2 @@
+from .optimize_for_amd_cpu import optimize_for_amd_cpu
+optimize_for_amd_cpu(thread_num_constraint=4)
