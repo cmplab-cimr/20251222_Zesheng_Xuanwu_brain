@@ -40,13 +40,6 @@ class FinalResult(GeneralFinalResult):
         return tissue_name, raw_flux_name
 
     def target_mid_name_process(self, raw_target_mid_name):
-        # new_target_mid_data_dict = {}
-        # for raw_mid_name, mid_data_value in target_mid_data_dict.items():
-        #     new_mid_name = raw_mid_name.replace(f'{CoreConstants.mix_ratio_prefix}(', '')
-        #     new_mid_name = new_mid_name.replace(f'{CoreConstants.convolution_id}(', '')
-        #     new_mid_name = new_mid_name.replace(f')', '')
-        #     new_target_mid_data_dict[new_mid_name] = mid_data_value
-        # return new_target_mid_data_dict
         new_target_mid_name = raw_target_mid_name.replace(f'{CoreConstants.mix_ratio_prefix}(', '')
         new_target_mid_name = new_target_mid_name.replace(f'{CoreConstants.convolution_id}(', '')
         new_target_mid_name = new_target_mid_name.replace(f')', '')

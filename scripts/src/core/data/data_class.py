@@ -46,24 +46,36 @@ class InputMetaboliteData(object):
         self.c13_ratio_list = c13_ratio_list
         self.abundance_list = normalized_abundance_list
         self.carbon_num = carbon_num
+        self.full_carbon_mid = None
+        self.generate_mid_vector()
 
     def __hash__(self):
         return self.name.__hash__()
 
-    def generate_mid_vector(self, emu_selected_carbon_list):
-        final_mid_vector = None
-        for c13_ratio_vector, abundance in zip(self.c13_ratio_list, self.abundance_list):
-            convolution_list = []
-            for carbon_index, selection_indicator in enumerate(emu_selected_carbon_list):
-                if selection_indicator == 1:
-                    c13_ratio = c13_ratio_vector[carbon_index]
-                    convolution_list.append(np.array([1 - c13_ratio, c13_ratio]))
-            new_mid_array = np_list_conv(convolution_list)
-            if final_mid_vector is None:
-                final_mid_vector = new_mid_array * abundance
-            else:
-                final_mid_vector += new_mid_array * abundance
-        return final_mid_vector / np.sum(final_mid_vector)
+    def generate_mid_vector(self, emu_selected_carbon_list=None):
+        if emu_selected_carbon_list is None and self.full_carbon_mid is not None:
+            final_mid_vector = self.full_carbon_mid
+        else:
+            tmp_sum_mid_vector = None
+            for c13_ratio_vector, abundance in zip(self.c13_ratio_list, self.abundance_list):
+                if emu_selected_carbon_list is None:
+                    convolution_array = np.vstack([1 - c13_ratio_vector, c13_ratio_vector]).T
+                    convolution_list = list(convolution_array)
+                else:
+                    convolution_list = []
+                    for carbon_index, selection_indicator in enumerate(emu_selected_carbon_list):
+                        if selection_indicator == 1:
+                            c13_ratio = c13_ratio_vector[carbon_index]
+                            convolution_list.append(np.array([1 - c13_ratio, c13_ratio]))
+                new_mid_array = np_list_conv(convolution_list)
+                if tmp_sum_mid_vector is None:
+                    tmp_sum_mid_vector = new_mid_array * abundance
+                else:
+                    tmp_sum_mid_vector += new_mid_array * abundance
+            final_mid_vector = tmp_sum_mid_vector / np.sum(tmp_sum_mid_vector)
+            if self.full_carbon_mid is None:
+                self.full_carbon_mid = final_mid_vector
+        return final_mid_vector
 
 
 def vector_normalize(raw_data_vector, eps_for_mid, metabolite_name=None, total_sum_threshold=None, warn_func=None):
@@ -198,12 +210,15 @@ class MIDData(object):
         self.ms_total_sum_threshold = ms_total_sum_threshold
         if len(compartment_list) > 1 or compartment_list[0] is None:
             compartment_list = None
-        self.full_name = compartmental_mid_name_constructor(
-            tissue_specific_name_constructor(metabolite_name, tissue_list),
-            compartment_list)
+        self.full_name = self.generate_full_name(metabolite_name, tissue_list, compartment_list)
         self.excluded_from_mfa = excluded_from_mfa
         self.invalid_index_list = invalid_index_list
         self.chemical_formula_dict = Atom.chemical_formula_dict_generator(chemical_formula_str)
+
+    def generate_full_name(self, metabolite_name, tissue_list, compartment_list):
+        return compartmental_mid_name_constructor(
+            tissue_specific_name_constructor(metabolite_name, tissue_list),
+            compartment_list)
 
     def exclude_this_mid(self):
         self.excluded_from_mfa = True
@@ -227,17 +242,26 @@ class MIDData(object):
         return False
 
     def copy(self):
+        new_invalid_index_list = None if self.invalid_index_list is None else list(self.invalid_index_list)
         new_mid_data_obj = MIDData(
             raw_data_vector=np.copy(self.raw_data_vector),
             raw_name=self.name, combined_raw_name_list=list(self.combined_standard_name_list),
             compartment_list=self.compartment, tissue_list=self.tissue,
             to_standard_name_dict=self.to_standard_name_dict, ms_total_sum_threshold=self.ms_total_sum_threshold,
-            invalid_index_list=self.invalid_index_list)
+            invalid_index_list=new_invalid_index_list)
         if self.data_vector is not None:
-            new_mid_data_obj.data_vector = self.data_vector
+            new_mid_data_obj.data_vector = np.copy(self.data_vector)
         new_mid_data_obj.excluded_from_mfa = self.excluded_from_mfa
         new_mid_data_obj.chemical_formula_dict = dict(self.chemical_formula_dict)
         return new_mid_data_obj
+
+    def change_tissue(self, tissue_list):
+        if tissue_list is None:
+            tissue_list = (None,)
+        else:
+            assert isinstance(tissue_list, (list, tuple))
+        self.tissue = tissue_list
+        self.full_name = self.generate_full_name(self.name, self.tissue, self.compartment)
 
     def __repr__(self):
         if self.compartment is not None:

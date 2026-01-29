@@ -297,6 +297,7 @@ class ProgressBarExtraProcess(object):
 
     def start(self):
         if self.display_progress_bar and self.manual_start:
-            self.started = True
-            self.new_daemon_process.start()
+            if not self.started:
+                self.started = True
+                self.new_daemon_process.start()
             self.send_pipe.send(0)

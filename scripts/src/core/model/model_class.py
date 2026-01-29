@@ -281,7 +281,8 @@ class MFAModel(object):
             flux_name_index_dict, flux_balance_matrix,
             flux_balance_right_side_vector, bare_metabolite_dim_dict, metabolite_bare_metabolite_name_dict,
             complete_tissue_compartment_metabolite_dict, input_metabolite_name_set, all_target_metabolite_name_set,
-            model_metabolite_to_standard_name_dict, user_defined_model):
+            model_metabolite_to_standard_name_dict, user_defined_model,
+            metabolite_full_name_tissue_compartment_dict):
         self.input_emu_dict = input_emu_dict
         self.target_emu_list = target_emu_list
         self.emu_name_dependency_dict = emu_name_dependency_dict
@@ -299,4 +300,5 @@ class MFAModel(object):
         self.all_target_metabolite_name_set = all_target_metabolite_name_set
         self.model_metabolite_to_standard_name_dict = model_metabolite_to_standard_name_dict
         self.user_defined_model = user_defined_model
+        self.metabolite_full_name_tissue_compartment_dict = metabolite_full_name_tissue_compartment_dict
 

@@ -219,6 +219,7 @@ class ModelKeyword(object):
     brain = 'brain'
     spleen = 'spleen'
     pancreas = 'pancreas'
+    pancreatic_islet = 'pancreatic_islet'
     lung = 'lung'
     small_intestine = 'small_intestine'
     colon = 'colon'

@@ -21,7 +21,10 @@ def common_model_constructor(user_defined_model: UserDefinedModel, new_format=Fa
     all_target_metabolite_name_set = list(complete_metabolite_dim_dict.keys() - input_metabolite_name_set)
     # all_target_metabolite_name_set = {
     #     key: value for key, value in complete_metabolite_dim_dict.items() if key not in input_metabolite_name_set}
-    complete_tissue_metabolite_compartment_dict, metabolite_bare_metabolite_name_dict = compart_all_metabolites(
+    (
+        complete_tissue_metabolite_compartment_dict, metabolite_bare_metabolite_name_dict,
+        metabolite_full_name_tissue_compartment_dict
+    ) = compart_all_metabolites(
         complete_metabolite_dim_dict.keys(), user_defined_model.model_compartment_set)
     bare_metabolite_dim_dict = metabolite_carbon_number_verification(
         complete_metabolite_dim_dict, metabolite_bare_metabolite_name_dict)
@@ -42,7 +45,8 @@ def common_model_constructor(user_defined_model: UserDefinedModel, new_format=Fa
         flux_balance_matrix, flux_balance_right_side_vector, bare_metabolite_dim_dict,
         metabolite_bare_metabolite_name_dict, complete_tissue_metabolite_compartment_dict,
         input_metabolite_name_set, all_target_metabolite_name_set,
-        user_defined_model.model_metabolite_to_standard_name_dict, user_defined_model)
+        user_defined_model.model_metabolite_to_standard_name_dict, user_defined_model,
+        metabolite_full_name_tissue_compartment_dict)
     return mfa_model
 
 

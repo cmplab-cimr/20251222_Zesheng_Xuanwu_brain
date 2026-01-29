@@ -359,6 +359,12 @@ def serial_solver_wrap(
             new_solving_process.close()
         else:
             slsqp_obj = specific_solver_constructor(base_solver_obj, mfa_config)
+            print('emu_name to experimental_name mapping: ')
+            print(
+                '\n'.join([
+                    f'{emu_key}:   {experimental_name}'
+                    for emu_key, experimental_name in slsqp_obj.emu_name_experimental_name_dict.items()
+                ]))
             progress_bar.start()
             if initial_flux_input is None:
                 initial_flux_input = universal_feasible_solution_generator(

@@ -159,9 +159,9 @@ def model_preprocess(
 def compart_all_metabolites(all_metabolite_name_list, model_compartment_set):
     compartment_suffix_dict = {
         compartment_label: '_{}'.format(compartment_label) for compartment_label in model_compartment_set}
-    # complete_compartment_metabolite_dict = defaultdict(lambda: set())
     complete_tissue_compartment_metabolite_dict = {}
     metabolite_bare_metabolite_name_dict = {}
+    metabolite_full_name_tissue_compartment_dict = {}
     for current_metabolite_name in all_metabolite_name_list:
         target_model_compartment = None
         bare_metabolite_name_with_tissue = None
@@ -187,7 +187,11 @@ def compart_all_metabolites(all_metabolite_name_list, model_compartment_set):
         complete_tissue_compartment_metabolite_dict[tissue_prefix][target_model_compartment].add(
             current_metabolite_name)
         metabolite_bare_metabolite_name_dict[current_metabolite_name] = bare_metabolite_name
-    return complete_tissue_compartment_metabolite_dict, metabolite_bare_metabolite_name_dict
+        metabolite_full_name_tissue_compartment_dict[current_metabolite_name] = (
+            tissue_prefix, target_model_compartment)
+    return (
+        complete_tissue_compartment_metabolite_dict, metabolite_bare_metabolite_name_dict,
+        metabolite_full_name_tissue_compartment_dict)
 
 
 def metabolite_carbon_number_verification(complete_metabolite_dim_dict, metabolite_bare_metabolite_name_dict):
@@ -229,3 +233,4 @@ def flux_balance_equation_generator(metabolite_reaction_dict, composite_reaction
             flux_balance_matrix[current_row_index, raw_flux_index] += composite_node_obj.coefficient
     flux_balance_right_side = np.zeros(complete_size)
     return flux_balance_matrix, flux_balance_right_side
+
