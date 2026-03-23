@@ -11,6 +11,8 @@ from scripts.figures.common.elements import Elements, ParameterName
 class Keywords(object):
     average = 'average'
     experimental = 'experimental'
+    mid_prediction = 'mid_prediction'
+    flux_comparison = 'flux_comparison'
 
 
 class FigureData(RawFigureData):

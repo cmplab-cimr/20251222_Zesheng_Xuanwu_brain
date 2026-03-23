@@ -7,8 +7,9 @@ from ..common_parallel_solver.result_class import FinalResult as GeneralFinalRes
 from ..io_functions.config import check_and_mkdir_of_direct
 from ..io_functions.result_processing_functions import (
     multiple_repeat_result_processing, loss_data_distribution_plotting,
-    time_distribution_plotting, experimental_mid_prediction, common_flux_comparison_func, figure_plotting,
-    experimental_data_plotting_func_template
+    time_distribution_plotting, figure_plotting,
+    experimental_data_plotting_func_template, experimental_mid_prediction_plotting_func_template,
+    flux_comparison_plotting_func_template
 )
 from ..io_functions.result_output_functions import output_raw_flux_data, output_predicted_mid_data
 

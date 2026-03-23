@@ -4,45 +4,6 @@ from .config import (
 from .plotting_functions import figure_plotting
 
 
-def common_flux_comparison_func(
-        current_important_flux_list, common_flux_name_index_dict, current_data_array, data_dict_for_plotting, key_name,
-        reversible_flux_title_constructor=None, extra_group_key_name=None):
-    def default_reversible_flux_title_constructor(flux_name_0, flux_name_1):
-        return f'{flux_name_0} - {flux_name_1}'
-
-    if reversible_flux_title_constructor is None:
-        reversible_flux_title_constructor = default_reversible_flux_title_constructor
-    for flux_name in current_important_flux_list:
-        if isinstance(flux_name, str):
-            flux_title = flux_name
-            flux_index = common_flux_name_index_dict[flux_name]
-            calculated_flux_array = current_data_array[:, flux_index]
-        elif isinstance(flux_name, tuple) or isinstance(flux_name, list):
-            if callable(flux_name[1]):
-                flux_title, flux_func = flux_name
-                flux_name_value_dict = {
-                    tmp_flux_name: current_data_array[:, flux_index]
-                    for tmp_flux_name, flux_index in common_flux_name_index_dict.items()}
-                calculated_flux_array = flux_func(flux_name_value_dict)
-            else:
-                # flux_title = '{} - {}'.format(flux_name[0], flux_name[1])
-                flux_title = reversible_flux_title_constructor(*flux_name)
-                flux_index1 = common_flux_name_index_dict[flux_name[0]]
-                flux_index2 = common_flux_name_index_dict[flux_name[1]]
-                calculated_flux_array = (
-                        current_data_array[:, flux_index1] - current_data_array[:, flux_index2])
-        else:
-            raise ValueError()
-        if flux_title not in data_dict_for_plotting:
-            data_dict_for_plotting[flux_title] = {}
-        if extra_group_key_name is not None:
-            if extra_group_key_name not in data_dict_for_plotting[flux_title]:
-                data_dict_for_plotting[flux_title][extra_group_key_name] = {}
-            data_dict_for_plotting[flux_title][extra_group_key_name][key_name] = calculated_flux_array
-        else:
-            data_dict_for_plotting[flux_title][key_name] = calculated_flux_array
-
-
 def add_empty_obj(root_dict, final_empty_class, *args):
     current_dict = root_dict
     total_arg_num = len(args)
@@ -56,27 +17,29 @@ def add_empty_obj(root_dict, final_empty_class, *args):
     return current_dict
 
 
+def sort_dict_and_remove_sorting_index(raw_dict):
+    ordered_list = list(raw_dict.items())
+    ordered_list.sort(key=lambda x: x[1][0])
+    new_dict = {}
+    for key, (value_index, value) in ordered_list:
+        new_dict[key] = value
+    return new_dict
+
+
+def convert_tmp_data_to_final_data_dict(tmp_data_dict):
+    final_data_dict = {}
+    for major_key, each_major_key_tmp_data_dict in tmp_data_dict.items():
+        final_data_dict[major_key] = {}
+        for metabolite_name, each_metabolite_data_dict in each_major_key_tmp_data_dict.items():
+            final_data_dict[major_key][metabolite_name] = sort_dict_and_remove_sorting_index(
+                each_metabolite_data_dict)
+    return final_data_dict
+
+
 def experimental_data_plotting_func_template(
         mouse_id_mfa_data_dict, tissue_mid_name_list_dict_constructor, major_minor_key_analysis_func,
         major_key_file_name_func=lambda major_key: f'target_metabolites_{major_key}_labeling',
         legend_color_dict=None, **figure_param_dict):
-    def sort_dict_and_remove_sorting_index(raw_dict):
-        ordered_list = list(raw_dict.items())
-        ordered_list.sort(key=lambda x: x[1][0])
-        new_dict = {}
-        for key, (value_index, value) in ordered_list:
-            new_dict[key] = value
-        return new_dict
-
-    def convert_tmp_data_to_final_data_dict(tmp_data_dict):
-        final_data_dict = {}
-        for major_key, each_major_key_tmp_data_dict in tmp_data_dict.items():
-            final_data_dict[major_key] = {}
-            for metabolite_name, each_metabolite_data_dict in each_major_key_tmp_data_dict.items():
-                final_data_dict[major_key][metabolite_name] = sort_dict_and_remove_sorting_index(
-                    each_metabolite_data_dict)
-        return final_data_dict
-
     def preprocess_all_result_label_data(
             complete_experimental_mfa_data_obj_dict, complete_mid_std_data_vector_dict):
         mid_data_dict = {}
@@ -271,94 +234,6 @@ def mid_name_list_generator_for_multiple_labeling_substrate(raw_metabolite_list,
                 combined_metabolite_row.append(combined_metabolite_name)
             final_metabolite_list.append(combined_metabolite_row)
     return final_metabolite_list
-
-
-def experimental_mid_prediction(
-        experiment_name, complex_predicted_data_dict, final_target_experimental_mid_data_dict,
-        mid_prediction_output_direct=None, subset_index_dict=None, mid_tissue_raw_name_dict=None, direct_plotting=False):
-    final_group_mid_all_data_point_dict = {}
-    final_group_mid_dict = {}
-    final_stderr_dict = {}
-    for data_label, raw_final_predicted_data_dict in complex_predicted_data_dict.items():
-        for result_label, result_specific_predicted_data_dict in raw_final_predicted_data_dict.items():
-            if result_label not in final_group_mid_all_data_point_dict:
-                final_group_mid_dict[result_label] = {}
-                final_stderr_dict[result_label] = {}
-                final_group_mid_all_data_point_dict[result_label] = {}
-            for mid_title, current_predicted_data_array_list in result_specific_predicted_data_dict.items():
-                if mid_tissue_raw_name_dict is not None:
-                    tissue_name, raw_metabolite_name = mid_tissue_raw_name_dict[mid_title]
-                    if raw_metabolite_name not in final_group_mid_all_data_point_dict[result_label]:
-                        final_group_mid_dict[result_label][raw_metabolite_name] = {}
-                        final_stderr_dict[result_label][raw_metabolite_name] = {}
-                        final_group_mid_all_data_point_dict[result_label][raw_metabolite_name] = {}
-                    if tissue_name not in final_group_mid_all_data_point_dict[result_label][raw_metabolite_name]:
-                        final_group_mid_dict[result_label][raw_metabolite_name][tissue_name] = {}
-                        final_stderr_dict[result_label][raw_metabolite_name][tissue_name] = {}
-                        final_group_mid_all_data_point_dict[result_label][raw_metabolite_name][tissue_name] = {}
-                    current_average_mid_dict = final_group_mid_dict[result_label][raw_metabolite_name][tissue_name]
-                    current_stderr_mid_dict = final_stderr_dict[result_label][raw_metabolite_name][tissue_name]
-                    current_mid_data_point_dict = final_group_mid_all_data_point_dict[
-                        result_label][raw_metabolite_name][tissue_name]
-                else:
-                    if mid_title not in final_group_mid_all_data_point_dict[result_label]:
-                        final_group_mid_dict[result_label][mid_title] = {}
-                        final_stderr_dict[result_label][mid_title] = {}
-                        final_group_mid_all_data_point_dict[result_label][mid_title] = {}
-                    current_average_mid_dict = final_group_mid_dict[result_label][mid_title]
-                    current_stderr_mid_dict = final_stderr_dict[result_label][mid_title]
-                    current_mid_data_point_dict = final_group_mid_all_data_point_dict[result_label][mid_title]
-                current_predicted_data_array = np.array(current_predicted_data_array_list)
-                if subset_index_dict is not None:
-                    target_predicted_data_array = current_predicted_data_array[subset_index_dict[result_label], :]
-                else:
-                    target_predicted_data_array = current_predicted_data_array
-                current_average_mid_dict[data_label] = target_predicted_data_array.mean(axis=0)
-                current_stderr_mid_dict[data_label] = target_predicted_data_array.std(axis=0)
-                current_mid_data_point_dict[data_label] = target_predicted_data_array
-    for data_label, raw_final_predicted_data_dict in complex_predicted_data_dict.items():
-        for result_label, result_specific_predicted_data_dict in raw_final_predicted_data_dict.items():
-            for mid_title in result_specific_predicted_data_dict.keys():
-                if mid_tissue_raw_name_dict is not None:
-                    tissue_name, raw_metabolite_name = mid_tissue_raw_name_dict[mid_title]
-                    # current_average_mid_dict = final_group_mid_dict[result_label][raw_metabolite_name][tissue_name]
-                    current_mid_data_point_dict = final_group_mid_all_data_point_dict[result_label][raw_metabolite_name][tissue_name]
-                else:
-                    # current_average_mid_dict = final_group_mid_dict[result_label][mid_title]
-                    current_mid_data_point_dict = final_group_mid_all_data_point_dict[result_label][mid_title]
-                if Keywords.experimental not in current_mid_data_point_dict:
-                    current_mid_data_point_dict[Keywords.experimental] = final_target_experimental_mid_data_dict[
-                        result_label][mid_title].reshape([1, -1])
-    for result_label, result_specific_plotting_data_dict in final_group_mid_all_data_point_dict.items():
-        current_average_mid_dict = final_group_mid_dict[result_label]
-        current_error_bar_data_dict = final_stderr_dict[result_label]
-        if direct_plotting:
-            current_result_mid_prediction_output_direct = '{}/{}'.format(
-                mid_prediction_output_direct, result_label)
-            check_and_mkdir_of_direct(current_result_mid_prediction_output_direct)
-        else:
-            current_result_mid_prediction_output_direct = None
-        if mid_tissue_raw_name_dict is not None:
-            for tissue_name, each_tissue_all_data_point_dict in result_specific_plotting_data_dict.items():
-                each_tissue_error_bar_data_dict = current_error_bar_data_dict[tissue_name]
-                each_tissue_average_data_dict = current_average_mid_dict[tissue_name]
-                if direct_plotting:
-                    current_tissue_mid_prediction_output_direct = '{}/{}'.format(
-                        current_result_mid_prediction_output_direct, tissue_name)
-                    check_and_mkdir_of_direct(current_tissue_mid_prediction_output_direct)
-                    group_bar_plot(
-                        each_tissue_average_data_dict, error_bar_data_dict=each_tissue_error_bar_data_dict,
-                        output_direct=current_tissue_mid_prediction_output_direct, ylim=(0, 1))
-                    figure_plotting.mid_comparison_plotting()
-        else:
-            # final_complete_data_dict[result_label] = (result_specific_plotting_data_dict, current_error_bar_data_dict)
-            if direct_plotting:
-                group_bar_plot(
-                    result_specific_plotting_data_dict, error_bar_data_dict=current_error_bar_data_dict,
-                    output_direct=current_result_mid_prediction_output_direct, ylim=(0, 1))
-                figure_plotting.mid_comparison_plotting()
-    figure_raw_data = FigureData(FigureDataKeywords.mid_comparison, experiment_name)
-    figure_raw_data.save_data(final_complete_data_dict=final_group_mid_all_data_point_dict)
 
 
 def loss_data_distribution_plotting(
@@ -626,4 +501,288 @@ def multiple_repeat_result_processing_new(
         new_final_predicted_mid_data_dict[result_label] = new_mid_data_dict
 
     return new_final_solution_data_dict, new_loss_data_dict, new_final_predicted_mid_data_dict
+
+
+def experimental_mid_prediction_plotting_func_template(
+        tissue_mid_name_list_dict_constructor, result_process_information_dict_analysis,
+        final_information_dict, mid_name_tissue_name_dict, solver_dict,
+        legend_color_dict=None, **figure_param_dict):
+    """
+    Template function for experimental MID prediction plotting.
+    Returns a function that performs the actual plotting.
+
+    Similar pattern to experimental_data_plotting_func_template.
+    """
+    default_experimental_transparency = 0.3
+
+    def preprocess_predicted_data(
+            complex_predicted_data_dict, final_target_experimental_mid_data_dict, subset_index_dict):
+        """Preprocess all result label data for MID prediction plotting."""
+        tmp_formatted_mean_data_dict = {}
+        tmp_formatted_std_data_dict = {}
+        data_len_dict = {}
+        subplot_name_dict = {}
+        tmp_color_dict = {}
+
+        tissue_mid_name_list_dict, display_mid_name_dict, display_tissue_name_dict = tissue_mid_name_list_dict_constructor(
+            result_process=True)
+
+        result_information_dict_list = result_process_information_dict_analysis(
+            final_information_dict, target=Keywords.mid_prediction)
+        # Filter out information for results that are missing in the predicted data
+        result_information_dict_list = [
+            item for item in result_information_dict_list
+            if item[0] in complex_predicted_data_dict
+        ]
+
+        for (
+                result_label, major_key, minor_key_list, minor_key_str, current_color, order_index
+        ) in result_information_dict_list:
+            result_specific_predicted_data_dict = complex_predicted_data_dict[result_label]
+            current_raw_emu_name_experimental_name_dict = solver_dict[result_label].emu_name_experimental_name_dict
+            current_emu_name_experimental_name_dict = {
+                mid_name_process(raw_emu_name): experiment_name
+                for raw_emu_name, experiment_name in current_raw_emu_name_experimental_name_dict.items()}
+            current_solver_target_experimental_mid_dict = {
+                mid_name_process(raw_mid_name): mid_vector
+                for raw_mid_name, mid_vector in solver_dict[result_label].target_experimental_mid_data_dict.items()
+            }
+            predicted_key_str = minor_key_str
+            experimental_key_str = f'{minor_key_str}_experimental'
+            if major_key not in tmp_color_dict:
+                tmp_color_dict[major_key] = {}
+            tmp_color_dict[major_key].update({
+                predicted_key_str: (order_index, current_color),
+                experimental_key_str: (order_index + 0.5, current_color.transparency_mix(default_experimental_transparency)),
+            })
+            current_target_experimental_mid_data_dict = final_target_experimental_mid_data_dict[result_label]
+
+            for mid_title, current_predicted_data_array_list in result_specific_predicted_data_dict.items():
+                if mid_title in mid_name_tissue_name_dict:
+                    tissue_name, raw_mid_name = mid_name_tissue_name_dict[mid_title]
+                else:
+                    from ..core.common.functions import tissue_name_breakdown
+                    tissue_name, raw_mid_name = tissue_name_breakdown(mid_title)
+                    mid_name_tissue_name_dict[mid_title] = (tissue_name, raw_mid_name)
+                current_experimental_name = current_emu_name_experimental_name_dict[mid_title]
+                updated_tissue_specific_mid_name = tissue_specific_name_constructor(current_experimental_name, tissue_name)
+                current_experimental_mid = current_solver_target_experimental_mid_dict[mid_title]
+                if major_key not in tmp_formatted_mean_data_dict:
+                    tmp_formatted_mean_data_dict[major_key] = {}
+                    tmp_formatted_std_data_dict[major_key] = {}
+                current_tmp_formatted_mean_data_dict = tmp_formatted_mean_data_dict[major_key]
+                current_tmp_formatted_std_data_dict = tmp_formatted_std_data_dict[major_key]
+                if updated_tissue_specific_mid_name not in current_tmp_formatted_mean_data_dict:
+                    current_tmp_formatted_mean_data_dict[updated_tissue_specific_mid_name] = {}
+                    current_tmp_formatted_std_data_dict[updated_tissue_specific_mid_name] = {}
+                    if display_mid_name_dict is not None and raw_mid_name in display_mid_name_dict:
+                        display_mid_name = display_mid_name_dict[raw_mid_name]
+                    else:
+                        display_mid_name = current_experimental_name
+                    display_tissue_mid_name = f'{tissue_name}: {display_mid_name}'
+                    subplot_name_dict[updated_tissue_specific_mid_name] = display_tissue_mid_name
+                current_predicted_data_array = np.array(current_predicted_data_array_list)
+                if subset_index_dict is not None:
+                    target_predicted_data_array = current_predicted_data_array[subset_index_dict[result_label], :]
+                else:
+                    target_predicted_data_array = current_predicted_data_array
+                if current_experimental_name not in data_len_dict:
+                    data_len_dict[current_experimental_name] = current_predicted_data_array.shape[1]
+                current_tmp_formatted_mean_data_dict[updated_tissue_specific_mid_name][predicted_key_str] = (
+                    order_index, target_predicted_data_array.mean(axis=0))
+                current_tmp_formatted_std_data_dict[updated_tissue_specific_mid_name][predicted_key_str] = (
+                    order_index, target_predicted_data_array.std(axis=0))
+                current_tmp_formatted_mean_data_dict[updated_tissue_specific_mid_name][experimental_key_str] = (
+                    order_index + 0.5, current_experimental_mid
+                )
+
+        formatted_mean_data_dict = convert_tmp_data_to_final_data_dict(tmp_formatted_mean_data_dict)
+        formatted_std_data_dict = convert_tmp_data_to_final_data_dict(tmp_formatted_std_data_dict)
+        complete_color_dict = {}
+        for major_key, each_major_key_tmp_color_dict in tmp_color_dict.items():
+            complete_color_dict[major_key] = sort_dict_and_remove_sorting_index(each_major_key_tmp_color_dict)
+        return (
+            formatted_mean_data_dict, formatted_std_data_dict, data_len_dict, subplot_name_dict, complete_color_dict,
+            tissue_mid_name_list_dict, display_mid_name_dict, display_tissue_name_dict
+        )
+
+    def mid_prediction_plotting(
+            experiment_name, complex_predicted_data_dict, final_target_experimental_mid_data_dict,
+            prediction_output_direct, subset_index_dict=None):
+        """Main plotting function that processes data and generates figures."""
+        (
+            formatted_mean_data_dict, formatted_std_data_dict, data_len_dict, subplot_name_dict, complete_color_dict,
+            tissue_mid_name_list_dict, display_mid_name_dict, display_tissue_name_dict
+        ) = preprocess_predicted_data(
+            complex_predicted_data_dict, final_target_experimental_mid_data_dict, subset_index_dict)
+
+        mean_data_dict = {}
+        std_data_dict = {}
+        mid_name_list_dict = {}
+        current_legend_color_dict = legend_color_dict
+
+        for major_key, current_formatted_mean_data in formatted_mean_data_dict.items():
+            current_formatted_std_data = formatted_std_data_dict[major_key]
+            # Import helper function for tissue-specific metabolite MID list construction
+            from ..mfa_analysis.common_functions import tissue_specific_metabolite_mid_list_constructor
+            current_mid_name_list, current_mean_data_dict, current_std_data_dict = tissue_specific_metabolite_mid_list_constructor(
+                current_formatted_mean_data, current_formatted_std_data, data_len_dict, tissue_mid_name_list_dict)
+            mean_data_dict[major_key] = current_formatted_mean_data
+            std_data_dict[major_key] = current_formatted_std_data
+            mid_name_list_dict[major_key] = current_mid_name_list
+
+            target_row_num = len(current_mid_name_list)
+            target_col_num = max([len(each_row_mid_name_list) for each_row_mid_name_list in current_mid_name_list])
+            if current_legend_color_dict is not None:
+                major_legend_color_dict = current_legend_color_dict[major_key]
+            else:
+                major_legend_color_dict = None
+            color_dict = complete_color_dict[major_key]
+
+            figure_plotting.mid_comparison_plotting(
+                figure_output_direct=prediction_output_direct, figure_name=f'predicted_mid_comparison_{major_key}',
+                complete_data_dict=current_mean_data_dict, target_emu_name_nested_list=current_mid_name_list,
+                target_row_num=target_row_num, target_col_num=target_col_num, error_bar_data_dict=current_std_data_dict,
+                color_dict=color_dict, legend_color_dict=major_legend_color_dict, y_lim=(0, 1),
+                **figure_param_dict)
+
+        figure_raw_data = FigureData(FigureDataKeywords.mid_comparison, experiment_name)
+        figure_raw_data.save_data(
+            mean_data_dict=mean_data_dict,
+            std_data_dict=std_data_dict,
+            mid_name_list=mid_name_list_dict,
+            subplot_name_dict=subplot_name_dict,
+        )
+
+    return mid_prediction_plotting
+
+
+def common_flux_comparison_func(
+        current_important_flux_list, common_flux_name_index_dict, current_data_array, data_dict_for_plotting, key_name,
+        order_index, reversible_flux_title_constructor=None, extra_group_key_name=None):
+    def default_reversible_flux_title_constructor(flux_name_0, flux_name_1):
+        return f'{flux_name_0} - {flux_name_1}'
+
+    if reversible_flux_title_constructor is None:
+        reversible_flux_title_constructor = default_reversible_flux_title_constructor
+    for flux_name in current_important_flux_list:
+        if isinstance(flux_name, str):
+            flux_title = flux_name
+            flux_index = common_flux_name_index_dict[flux_name]
+            calculated_flux_array = current_data_array[:, flux_index]
+        elif isinstance(flux_name, tuple) or isinstance(flux_name, list):
+            if callable(flux_name[1]):
+                flux_title, flux_func = flux_name
+                flux_name_value_dict = {
+                    tmp_flux_name: current_data_array[:, flux_index]
+                    for tmp_flux_name, flux_index in common_flux_name_index_dict.items()}
+                calculated_flux_array = flux_func(flux_name_value_dict)
+            else:
+                # flux_title = '{} - {}'.format(flux_name[0], flux_name[1])
+                flux_title = reversible_flux_title_constructor(*flux_name)
+                flux_index1 = common_flux_name_index_dict[flux_name[0]]
+                flux_index2 = common_flux_name_index_dict[flux_name[1]]
+                calculated_flux_array = (
+                        current_data_array[:, flux_index1] - current_data_array[:, flux_index2])
+        else:
+            raise ValueError()
+        if flux_title not in data_dict_for_plotting:
+            data_dict_for_plotting[flux_title] = {}
+        if extra_group_key_name is not None:
+            if extra_group_key_name not in data_dict_for_plotting[flux_title]:
+                data_dict_for_plotting[flux_title][extra_group_key_name] = {}
+            data_dict_for_plotting[flux_title][extra_group_key_name][key_name] = (order_index, calculated_flux_array)
+        else:
+            data_dict_for_plotting[flux_title][key_name] = (order_index, calculated_flux_array)
+
+
+def flux_comparison_plotting_func_template(
+        tissue_flux_name_list_dict_constructor, flux_name_tissue_name_dict, result_process_information_dict_analysis,
+        reversible_flux_pair_dict_generator, tissue_specific_reversible_flux_title_constructor_generator,
+        **figure_param_dict):
+    """
+    Template function for flux comparison plotting.
+    Returns a function that performs the actual plotting.
+
+    Similar pattern to experimental_data_plotting_func_template.
+    """
+
+    def preprocess_flux_data(
+            solution_array_dict, final_flux_name_index_dict, subset_index_dict):
+        """Preprocess flux data for all result labels."""
+        (
+            all_tissue_flux_name_list_dict, display_flux_dict, specific_tissue_reversible_flux_pair_dict
+        ) = tissue_flux_name_list_dict_constructor()
+
+        preprocessed_flux_data_dict = {}
+        for result_label, current_solution_array in solution_array_dict.items():
+            current_flux_name_index_dict = final_flux_name_index_dict[result_label]
+            reversible_flux_pair_dict, all_flux_name_list = reversible_flux_pair_dict_generator(
+                current_flux_name_index_dict, flux_name_tissue_name_dict, specific_tissue_reversible_flux_pair_dict)
+            if subset_index_dict is not None:
+                target_solution_array = current_solution_array[subset_index_dict[result_label], :]
+            else:
+                target_solution_array = current_solution_array
+            preprocessed_flux_data_dict[result_label] = (
+                current_flux_name_index_dict, all_flux_name_list, target_solution_array)
+
+        return preprocessed_flux_data_dict, all_tissue_flux_name_list_dict, display_flux_dict
+
+    def flux_comparison_plotting(
+            experiment_name, solution_array_dict, final_flux_name_index_dict, final_information_dict,
+            flux_comparison_output_direct, subset_index_dict=None):
+        """Main plotting function that processes data and generates figures."""
+        preprocessed_flux_data_dict, all_tissue_flux_name_list_dict, display_flux_dict = preprocess_flux_data(
+            solution_array_dict, final_flux_name_index_dict, subset_index_dict)
+
+        extra_group_key_name = ''
+        tmp_organized_mouse_data_dict = {}
+        tmp_color_dict = {}
+        tmp_name_dict = {}
+        for (
+                result_label, major_key, minor_key_list, minor_key_str, current_color, order_index
+        ) in result_process_information_dict_analysis(final_information_dict, target=Keywords.flux_comparison):
+            (
+                current_flux_name_index_dict, all_flux_name_list, target_solution_array
+            ) = preprocessed_flux_data_dict[result_label]
+            if major_key not in tmp_organized_mouse_data_dict:
+                tmp_organized_mouse_data_dict[major_key] = {}
+                tmp_color_dict[major_key] = {}
+                tmp_name_dict[major_key] = {}
+            tmp_color_dict[major_key][minor_key_str] = (order_index, current_color)
+            tmp_name_dict[major_key][minor_key_str] = (order_index, minor_key_str)
+            common_flux_comparison_func(
+                all_flux_name_list, current_flux_name_index_dict, target_solution_array,
+                tmp_organized_mouse_data_dict[major_key], minor_key_str, order_index,
+                extra_group_key_name=extra_group_key_name,
+                reversible_flux_title_constructor=tissue_specific_reversible_flux_title_constructor_generator(
+                    flux_name_tissue_name_dict))
+
+        organized_mouse_data_dict = {}
+        color_dict = {}
+        name_dict = {}
+        for major_key, each_major_key_tmp_data_dict in tmp_organized_mouse_data_dict.items():
+            color_dict[major_key] = sort_dict_and_remove_sorting_index(tmp_color_dict[major_key])
+            name_dict[major_key] = sort_dict_and_remove_sorting_index(tmp_name_dict[major_key])
+            organized_mouse_data_dict[major_key] = {}
+            for flux_name, each_flux_data_dict in each_major_key_tmp_data_dict.items():
+                organized_mouse_data_dict[major_key][flux_name] = {
+                    extra_group_key_name: sort_dict_and_remove_sorting_index(
+                        each_flux_data_dict[extra_group_key_name])}
+
+        for major_key, current_data_dict in organized_mouse_data_dict.items():
+            from ..mfa_analysis.common_functions import tissue_specific_flux_list_constructor
+            current_flux_name_nested_list, tissue_specific_display_flux_dict = tissue_specific_flux_list_constructor(
+                all_tissue_flux_name_list_dict, display_flux_dict)
+            figure_plotting.distribution_comparison_plotting(
+                figure_output_direct=flux_comparison_output_direct, figure_name=f'flux_comparison_{major_key}',
+                complete_data_dict=current_data_dict, flux_name_nested_list=current_flux_name_nested_list,
+                display_flux_dict=tissue_specific_display_flux_dict, name_dict=name_dict[major_key],
+                color_dict=color_dict[major_key], **figure_param_dict)
+
+        figure_raw_data = FigureData(FigureDataKeywords.flux_comparison, experiment_name)
+        figure_raw_data.save_data(
+            organized_diet_mouse_data_dict=organized_mouse_data_dict,)
+
+    return flux_comparison_plotting
 
