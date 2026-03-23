@@ -332,28 +332,6 @@ def flux_comparison_parameter_generator(
             reversible_flux_title_constructor=tissue_specific_reversible_flux_title_constructor_generator(
                 flux_name_tissue_name_dict))
 
-    # for result_label, current_solution_array in solution_array_dict.items():
-    #     current_flux_name_index_dict = flux_name_index_dict[result_label]
-    #     reversible_flux_pair_dict, all_flux_name_list = reversible_flux_pair_dict_generator(
-    #         current_flux_name_index_dict, flux_name_tissue_name_dict, specific_tissue_reversible_flux_pair_dict)
-    #     major_key, minor_key_list, minor_key_str, current_color, order_index = result_process_information_dict_analysis(
-    #         information_dict[result_label])
-    #     if major_key not in organized_mouse_data_dict:
-    #         organized_mouse_data_dict[major_key] = {}
-    #         color_dict[major_key] = {}
-    #         name_dict[major_key] = {}
-    #     color_dict[major_key][minor_key_str] = current_color
-    #     name_dict[major_key][minor_key_str] = minor_key_str
-    #     if subset_index_dict is not None:
-    #         target_solution_array = current_solution_array[subset_index_dict[result_label], :]
-    #     else:
-    #         target_solution_array = current_solution_array
-    #     common_flux_comparison_func(
-    #         all_flux_name_list, current_flux_name_index_dict, target_solution_array,
-    #         organized_mouse_data_dict[major_key], minor_key_str, extra_group_key_name='',
-    #         reversible_flux_title_constructor=tissue_specific_reversible_flux_title_constructor_generator(
-    #             flux_name_tissue_name_dict))
-
     for major_key, current_data_dict in organized_mouse_data_dict.items():
         current_flux_name_nested_list, tissue_specific_display_flux_dict = tissue_specific_flux_list_constructor(
             all_tissue_flux_name_list_dict, display_flux_dict)
@@ -366,51 +344,6 @@ def flux_comparison_parameter_generator(
     figure_raw_data = FigureData(FigureDataKeywords.flux_comparison, experiment_name)
     figure_raw_data.save_data(
         organized_diet_mouse_data_dict=organized_mouse_data_dict,)
-
-
-def mfa_data_dict_preprocess(
-        mouse_id_mfa_data_dict, std_mid_data_vector_dict, display_mid_name_dict, display_tissue_name_dict,
-        specific_dimension_metabolite_dict=None):
-    if specific_dimension_metabolite_dict is None:
-        specific_dimension_metabolite_dict = {}
-    formatted_mean_data_dict = {}
-    formatted_std_data_dict = {}
-    subplot_name_dict = {}
-    data_len_dict = {
-        metabolite_name: dimension + 1
-        for metabolite_name, dimension in specific_dimension_metabolite_dict.items()}
-    for mouse_id, mfa_data_obj in mouse_id_mfa_data_dict.items():
-        for tissue_metabolite_name, mid_data_obj in mfa_data_obj.experimental_mid_data_obj_dict.items():
-            metabolite_name = mid_data_obj.name
-            mid_data_vector = mid_data_obj.data_vector
-            tissue = mid_data_obj.tissue
-            if isinstance(tissue, (tuple, list)) and len(tissue) == 1:
-                tissue = tissue[0]
-            if metabolite_name not in data_len_dict:
-                data_len_dict[metabolite_name] = len(mid_data_vector)
-            new_tissue_specific_mid_name = tissue_specific_name_constructor(metabolite_name, tissue)
-            if new_tissue_specific_mid_name not in formatted_mean_data_dict:
-                formatted_mean_data_dict[new_tissue_specific_mid_name] = {}
-                formatted_std_data_dict[new_tissue_specific_mid_name] = {}
-            formatted_mean_data_dict[new_tissue_specific_mid_name][mouse_id] = mid_data_vector
-            try:
-                current_std_data_vector = std_mid_data_vector_dict[mouse_id][tissue_metabolite_name]
-            except KeyError:
-                current_std_data_vector = None
-            formatted_std_data_dict[new_tissue_specific_mid_name][mouse_id] = current_std_data_vector
-            if new_tissue_specific_mid_name not in subplot_name_dict:
-                display_mid_name = (
-                    display_mid_name_dict[metabolite_name] if metabolite_name in display_mid_name_dict
-                    else metabolite_name)
-                if tissue is None:
-                    display_tissue_mid_name = display_mid_name
-                else:
-                    display_tissue_name = (
-                        display_tissue_name_dict[tissue] if tissue in display_tissue_name_dict
-                        else tissue)
-                    display_tissue_mid_name = f'{display_tissue_name}: {display_mid_name}'
-                subplot_name_dict[new_tissue_specific_mid_name] = display_tissue_mid_name
-    return formatted_mean_data_dict, formatted_std_data_dict, subplot_name_dict, data_len_dict
 
 
 def metabolic_network_plotting(
@@ -455,48 +388,3 @@ def experimental_mid_and_raw_data_plotting(
         **experimental_figure_config_dict)(
             mouse_id_mfa_data_dict, result_information_dict, experimental_data_output_direct,
             complete_mid_std_data_vector_dict=None)
-
-
-def plotting_mid_data(
-        data_dict, error_bar_data_dict=None, mouse_id_diet_dict=None, mid_name_list=None, subplot_name_dict=None,
-        low_height=False, figure_title=None, figure_name=None, figure_output_direct=None,
-        color_dict=None, name_dict=None, diet_data_dict=False):
-    figure_size = (8.5, 11)
-    ParameterName = figure_plotting.ParameterName
-
-    if mid_name_list is None:
-        raise ValueError()
-    diet_mouse_id_list_dict = {}
-    for mouse_id, diet_name in mouse_id_diet_dict.items():
-        if diet_name not in diet_mouse_id_list_dict:
-            diet_mouse_id_list_dict[diet_name] = []
-        diet_mouse_id_list_dict[diet_name].append(mouse_id)
-    if diet_data_dict:
-        final_color_dict = color_dict
-    else:
-        mouse_id_color_dict = {}
-        for diet_name, diet_color in color_dict.items():
-            for mouse_id in diet_mouse_id_list_dict[diet_name]:
-                mouse_id_color_dict[mouse_id] = diet_color
-        final_color_dict = mouse_id_color_dict
-    # name_dict = {mouse_id: mouse_id for mouse_id in mouse_id_diet_dict.keys()}
-    legend_color_dict = color_dict
-    legend_name_dict = name_dict
-    if subplot_name_dict is None:
-        subplot_name_dict = {}
-    figure_data_parameter_dict = {
-        ParameterName.figure_data: (data_dict, error_bar_data_dict),
-        ParameterName.figure_title: figure_title,
-        ParameterName.name_dict: legend_name_dict,
-        ParameterName.legend_color_dict: legend_color_dict,
-        ParameterName.color_dict: final_color_dict,
-        ParameterName.mid_name_list: mid_name_list,
-        ParameterName.subplot_name_dict: subplot_name_dict,
-        ParameterName.low_height: low_height,
-        ParameterName.figure_config_dict: {},
-    }
-    figure_plotting.mid_prediction_function(
-        figure_output_direct=figure_output_direct, figure_name=figure_name,
-        figure_data_parameter_dict=figure_data_parameter_dict, figure_size=figure_size)
-
-

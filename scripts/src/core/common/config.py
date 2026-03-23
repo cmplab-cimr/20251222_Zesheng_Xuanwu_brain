@@ -7,11 +7,6 @@ class CoreConstants(object):
     # eps_for_sampling = 1e-11
     eps_for_sampling = 1e-20
     natural_c13_ratio = 0.01109
-    natural_o18_ratio = 0.002
-    natural_n15_ratio = 0.0036
-    natural_h2_ratio = 0.00015
-    natural_s33_ratio = 0.0076
-    natural_s34_ratio = 0.0422
     maximal_unconstrained_flux_value = 1e8
 
     lp_random_min_factor = 2
@@ -221,6 +216,7 @@ class ModelKeyword(object):
     pancreas = 'pancreas'
     pancreatic_islet = 'pancreatic_islet'
     lung = 'lung'
+    stomach = 'stomach'
     small_intestine = 'small_intestine'
     colon = 'colon'
     muscle = 'muscle'

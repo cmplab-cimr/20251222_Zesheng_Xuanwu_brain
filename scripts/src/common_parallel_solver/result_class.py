@@ -623,7 +623,7 @@ class FinalResult(object):
             slsqp_solver_obj_list = None
         else:
             raise ValueError()
-        this_solution_raw_predicted_mid_data_dict_list, _ = multi_solver_parallel_predictor(
+        (*_, this_solution_raw_predicted_mid_data_dict_list, _) = multi_solver_parallel_predictor(
             [complete_solution_array[current_predicted_data_num:]],
             mfa_tuple_list=mfa_tuple_list, slsqp_solver_obj_list=slsqp_solver_obj_list,
             processes_num=12, predict_all_mid=False, parallel_test=False, display_progress_bar=True,

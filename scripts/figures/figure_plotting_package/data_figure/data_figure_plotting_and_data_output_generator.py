@@ -141,8 +141,14 @@ def each_group_scatter_plotting(
             scatter_param_dict=scatter_param_dict, x_lim=x_lim, x_ticks=x_ticks, y_lim=y_lim, y_ticks=y_ticks,
             cutoff=cutoff_value, cutoff_param_dict=cutoff_param_dict)
     if error_bar and y_std_array is not None:
+        if len(marker_color) == 1:
+            error_bar_color = it.repeat(marker_color[0])
+        elif len(marker_color) == len(x_value_array):
+            error_bar_color = marker_color
+        else:
+            raise ValueError()
         core_error_bar_plotting(
-            current_ax, x_value_array, y_mean_array, y_std_array, edge_color=marker_color, **error_bar_param_dict)
+            current_ax, x_value_array, y_mean_array, y_std_array, edge_color=error_bar_color, **error_bar_param_dict)
 
 
 def single_scatter_plotting(

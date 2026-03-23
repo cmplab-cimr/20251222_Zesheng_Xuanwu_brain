@@ -551,3 +551,79 @@ def multiple_repeat_result_processing(
 
     return new_final_solution_data_dict, new_loss_data_dict, new_final_predicted_mid_data_dict
 
+
+def multiple_repeat_result_processing_new(
+        solver_dict, final_solution_data_dict, final_loss_data_dict, final_predicted_mid_data_dict,
+        repeat_division_num=1, each_optimization_num=None, loss_percentile=None, select_num=None):
+    def index_start_end_generator(total_num, batch_num, optimization_num, start_index=0):
+        if total_num == 0:
+            return
+        if optimization_num is not None:
+            base_num = optimization_num
+            if batch_num is None:
+                batch_num = total_num // base_num
+        else:
+            if batch_num is not None and batch_num > total_num:
+                batch_num = total_num
+            base_num = total_num // batch_num
+
+        if base_num == 0:
+            return
+
+
+        remainder = total_num % base_num
+        size_list = [base_num] * batch_num
+        current_start_index = start_index
+        for current_size in size_list:
+            current_end_index = current_start_index + current_size
+            yield current_start_index, current_end_index
+            current_start_index = current_end_index
+
+    new_loss_data_dict = {}
+    new_final_solution_data_dict = {}
+    new_final_predicted_mid_data_dict = {}
+
+    for result_label, loss_array in final_loss_data_dict.items():
+        if isinstance(repeat_division_num, dict):
+            this_result_repeat_division = repeat_division_num[result_label]
+        elif isinstance(repeat_division_num, int):
+            this_result_repeat_division = repeat_division_num
+        elif repeat_division_num is None:
+            this_result_repeat_division = None
+        else:
+            raise TypeError
+        if isinstance(each_optimization_num, dict):
+            this_result_optimization_num = each_optimization_num[result_label]
+        elif isinstance(each_optimization_num, int):
+            this_result_optimization_num = each_optimization_num
+        elif each_optimization_num is None:
+            this_result_optimization_num = None
+        else:
+            raise TypeError
+        solver_obj = solver_dict[result_label]
+        solution_array = final_solution_data_dict[result_label]
+        predicted_mid_data_dict = final_predicted_mid_data_dict[result_label]
+        new_loss_list = []
+        new_solution_list = []
+        new_mid_data_dict = {}
+        total_solution_num = len(loss_array)
+        for index_start, index_end in index_start_end_generator(
+                total_solution_num, this_result_repeat_division, this_result_optimization_num):
+            this_repeat_loss_array = loss_array[index_start:index_end]
+            filtered_index = select_solutions(this_repeat_loss_array, loss_percentile, select_num, index_start)
+            mean_solution_array = np.mean(solution_array[filtered_index, :], 0)
+            calculated_loss = solver_obj.obj_eval(mean_solution_array)
+            calculated_mid_data_dict = solver_obj.predict(mean_solution_array)
+            new_solution_list.append(mean_solution_array)
+            new_loss_list.append(calculated_loss)
+            for mid_title, predicted_mid_array in calculated_mid_data_dict.items():
+                processed_mid_title = mid_name_process(mid_title)
+                if processed_mid_title not in new_mid_data_dict:
+                    new_mid_data_dict[processed_mid_title] = []
+                new_mid_data_dict[processed_mid_title].append(predicted_mid_array)
+        new_loss_data_dict[result_label] = np.array(new_loss_list)
+        new_final_solution_data_dict[result_label] = np.array(new_solution_list)
+        new_final_predicted_mid_data_dict[result_label] = new_mid_data_dict
+
+    return new_final_solution_data_dict, new_loss_data_dict, new_final_predicted_mid_data_dict
+

@@ -4,6 +4,8 @@ from ..common.config import CoreConstants
 from ..common.functions import (
     natural_dist, np_list_conv, compartmental_mid_name_constructor, tissue_specific_name_constructor)
 
+from .chemical_formula_dict import (metabolite_name_formula_dict, specific_dimension_metabolite_dict)
+
 
 class InputMetaboliteData(object):
     def __init__(self, metabolite_name, c13_ratio_abundance_list=None, carbon_num=None):
@@ -90,23 +92,83 @@ def vector_normalize(raw_data_vector, eps_for_mid, metabolite_name=None, total_s
     # return (raw_data_vector + raw_data_sum / data_length * eps_for_mid) / correct_sum
 
 
+def abundance_dict_mass_dict_generator(isotope_abundance_mass_dict):
+    isotope_abundance_dict = {}
+    isotope_mass_dict = {}
+
+    for atom_name, atom_mass_ratio_pair_list in isotope_abundance_mass_dict.items():
+        mass_list, abundance_list = zip(*atom_mass_ratio_pair_list)
+        isotope_abundance_dict[atom_name] = np.array(abundance_list)
+        isotope_mass_dict[atom_name] = np.array(mass_list)
+    return isotope_abundance_dict, isotope_mass_dict
+
+
 class Atom(object):
     carbon = 'c'
     oxygen = 'o'
     nitrogen = 'n'
     sulfur = 's'
     hydrogen = 'h'
-    phosphate = 'p'
+    phosphorus = 'p'
+
+    natural_c13_ratio = CoreConstants.natural_c13_ratio
+    natural_o17_ratio = 0.00038
+    natural_o18_ratio = 0.002
+    natural_n15_ratio = 0.0038
+    natural_h2_ratio = 0.000145
+    natural_s33_ratio = 0.00763
+    natural_s34_ratio = 0.04365
 
     isotope_offset_abundance_dict = {
-        carbon: [(1, CoreConstants.natural_c13_ratio)],
-        oxygen: [(2, CoreConstants.natural_o18_ratio)],
-        nitrogen: [(1, CoreConstants.natural_n15_ratio)],
-        sulfur: [(1, CoreConstants.natural_s33_ratio), (2, CoreConstants.natural_s34_ratio)],
-        hydrogen: [(1, CoreConstants.natural_h2_ratio)],
+        carbon: [(1, natural_c13_ratio)],
+        oxygen: [(2, natural_o18_ratio)],
+        nitrogen: [(1, natural_n15_ratio)],
+        sulfur: [(1, natural_s33_ratio), (2, natural_s34_ratio)],
+        hydrogen: [(1, natural_h2_ratio)],
     }
 
-    complete_atom_dict = {carbon: 0, oxygen: 0, nitrogen: 0, sulfur: 0, hydrogen: 0, phosphate: 0}
+    isotope_precise_mass_abundance_dict = {
+        carbon: [
+            (12.0, 1 - natural_c13_ratio),
+            (13.003_355, natural_c13_ratio),
+        ],
+        oxygen: [
+            (15.994_914, 1 - natural_o17_ratio - natural_o18_ratio),
+            (16.999_131, natural_o17_ratio),
+            (17.999_159, natural_o18_ratio),
+        ],
+        nitrogen: [
+            (14.003_074, 1 - natural_n15_ratio),
+            (15.000_108, natural_n15_ratio),
+        ],
+        hydrogen: [
+            (1.007_825, 1 - natural_h2_ratio),
+            (2.014_101, natural_h2_ratio),
+        ],
+        sulfur: [
+            (31.972_071, 1 - natural_s33_ratio - natural_s34_ratio),
+            (32.971_458, natural_s33_ratio),
+            (33.967_867, natural_s34_ratio),
+        ],
+        phosphorus: [
+            (30.973_761, 1),
+        ],
+    }
+
+    isotope_abundance_dict, isotope_mass_dict = abundance_dict_mass_dict_generator(
+        isotope_precise_mass_abundance_dict)
+
+    complete_atom_dict = {carbon: 0, hydrogen: 0, oxygen: 0, nitrogen: 0, sulfur: 0, phosphorus: 0}
+
+    isotope_num_mid_dict = {
+        atom_name: [single_mid_array]
+        for atom_name, single_mid_array in isotope_abundance_dict.items()
+    }
+    computed_atom_dict = {
+        carbon: None, oxygen: None, nitrogen: None, sulfur: None, hydrogen: None
+    }
+    computed_chemical_str_formula_dict = {}
+    computed_chemical_formula_mid_dict = {}
 
     @classmethod
     def chemical_formula_dict_generator(cls, chemical_formula_str):
@@ -115,30 +177,39 @@ class Atom(object):
         elif not isinstance(chemical_formula_str, str):
             raise TypeError('')
         else:
-            chemical_formula_dict = {}
             chemical_formula_str = chemical_formula_str.lower()
-            str_index = 0
-            formula_str_len = len(chemical_formula_str)
-            while str_index < formula_str_len:
-                current_str = chemical_formula_str[str_index]
-                if current_str not in cls.complete_atom_dict or current_str in chemical_formula_dict:
-                    raise ValueError()
+            if chemical_formula_str in cls.computed_chemical_str_formula_dict:
+                return cls.computed_chemical_str_formula_dict[chemical_formula_str]
+            else:
+                chemical_formula_dict = {}
+                str_index = 0
+                formula_str_len = len(chemical_formula_str)
+                while str_index < formula_str_len:
+                    current_str = chemical_formula_str[str_index]
+                    if current_str not in cls.complete_atom_dict or current_str in chemical_formula_dict:
+                        raise ValueError()
 
-                next_str_index = str_index + 1
-                while next_str_index < formula_str_len and chemical_formula_str[next_str_index].isdigit():
-                    next_str_index += 1
-                this_chemical_num_str = chemical_formula_str[str_index + 1:next_str_index]
-                if this_chemical_num_str == '':
-                    this_chemical_num = 1
-                else:
-                    this_chemical_num = int(this_chemical_num_str)
-                chemical_formula_dict[current_str] = this_chemical_num
-                str_index = next_str_index
-            return chemical_formula_dict
+                    next_str_index = str_index + 1
+                    while next_str_index < formula_str_len and chemical_formula_str[next_str_index].isdigit():
+                        next_str_index += 1
+                    this_chemical_num_str = chemical_formula_str[str_index + 1:next_str_index]
+                    if this_chemical_num_str == '':
+                        this_chemical_num = 1
+                    else:
+                        this_chemical_num = int(this_chemical_num_str)
+                    chemical_formula_dict[current_str] = this_chemical_num
+                    str_index = next_str_index
+                ordered_chemical_formula_dict = {
+                    atom_label: chemical_formula_dict[atom_label]
+                    for atom_label in cls.complete_atom_dict.keys()
+                    if atom_label in chemical_formula_dict
+                }
+                cls.computed_chemical_str_formula_dict[chemical_formula_str] = ordered_chemical_formula_dict
+                return ordered_chemical_formula_dict
 
 
     @classmethod
-    def rare_isotope_vector_generator(cls, chemical_formula_dict):
+    def rare_isotope_vector_generator_old(cls, chemical_formula_dict):
         final_mid_conv_list = []
         for atom_label, atom_num in chemical_formula_dict.items():
             if atom_label not in cls.isotope_offset_abundance_dict:
@@ -161,6 +232,49 @@ class Atom(object):
                 final_mid_conv_list.append(current_mid_vector)
         final_mid_array = np_list_conv(final_mid_conv_list)
         return final_mid_array
+
+    @classmethod
+    def rare_isotope_vector_generator(cls, chemical_formula_dict):
+        def compute_num_repeat_mid(target_num, complete_mid_list):
+            while len(complete_mid_list) < target_num:
+                complete_mid_list.append(None)
+            current_mid = complete_mid_list[target_num - 1]
+            if current_mid is None:
+                input_num_1 = target_num // 2
+                input_num_2 = target_num - input_num_1
+                input_mid_1 = compute_num_repeat_mid(input_num_1, complete_mid_list)
+                input_mid_2 = compute_num_repeat_mid(input_num_2, complete_mid_list)
+                current_mid = np.convolve(input_mid_1, input_mid_2, mode='full')
+                complete_mid_list[target_num - 1] = current_mid
+            return current_mid
+
+        chemical_formula_str = ''.join([
+            f'{atom_label}{str(atom_num)}'
+            for atom_label, atom_num in chemical_formula_dict.items()])
+        if chemical_formula_str in cls.computed_chemical_formula_mid_dict:
+            final_mid_array = cls.computed_chemical_formula_mid_dict[chemical_formula_str]
+        else:
+            final_mid_conv_list = []
+            for atom_label, atom_num in chemical_formula_dict.items():
+                if atom_label not in cls.isotope_num_mid_dict:
+                    raise ValueError()
+                if atom_label not in cls.computed_atom_dict:
+                    continue
+                current_mid_vector = compute_num_repeat_mid(atom_num, cls.isotope_num_mid_dict[atom_label])
+                final_mid_conv_list.append(current_mid_vector)
+            final_mid_array = np_list_conv(final_mid_conv_list)
+            cls.computed_chemical_formula_mid_dict[chemical_formula_str] = final_mid_array
+        return final_mid_array
+
+
+complete_metabolite_dim_dict = {
+    **{
+        metabolite_name: Atom.chemical_formula_dict_generator(chemical_formula_str)[Atom.carbon]
+        for metabolite_name, chemical_formula_str in metabolite_name_formula_dict.items()
+        if metabolite_name not in specific_dimension_metabolite_dict
+    },
+    **specific_dimension_metabolite_dict
+}
 
 
 class MIDData(object):

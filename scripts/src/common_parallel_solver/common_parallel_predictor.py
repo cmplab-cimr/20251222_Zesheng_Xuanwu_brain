@@ -181,5 +181,7 @@ def multi_solver_parallel_predictor(
         ) = common_parallel_predictor(
             parameter_list_iter, total_solver_num=total_solver_num, processes_num=processes_num,
             parallel_test=updated_parallel_test, predict_all_mid=predict_all_mid,)
-    return all_final_raw_predicted_mid_data_dict_list, all_final_raw_all_predicted_mid_data_dict_list
+    return (
+        base_solver_obj_for_parallel_list, mfa_solver_option_dict_list,
+        all_final_raw_predicted_mid_data_dict_list, all_final_raw_all_predicted_mid_data_dict_list)
 

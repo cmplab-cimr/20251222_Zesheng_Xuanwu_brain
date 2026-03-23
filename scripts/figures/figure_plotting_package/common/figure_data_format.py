@@ -15,7 +15,7 @@ class RenameUnpickler(pickle.Unpickler):
                 'common_and_plotting_functions.figure_data_format',
                 'scripts.src.common.common.config', 'scripts.src.common.config', 'src.config'
         }:
-            renamed_module = 'figure_plotting_package.common.figure_data_format'
+            renamed_module = 'figures.figure_plotting_package.common.figure_data_format'
         return super(RenameUnpickler, self).find_class(renamed_module, name)
 
 

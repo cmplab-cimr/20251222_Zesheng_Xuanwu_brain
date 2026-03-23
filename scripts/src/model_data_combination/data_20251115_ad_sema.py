@@ -84,7 +84,7 @@ class UserDefinedMFASettings(MFASettings):
     optimization_num_for_each_suffix_dict = {
         None: 10000,
     }
-    average_optimized_results = 50
+    average_optimized_results = None
 
 user_defined_mfa_settings = UserDefinedMFASettings()
 
@@ -92,58 +92,36 @@ def result_process_information_dict_analysis(complete_result_information_dict, t
     from scripts.figures.common.config import ColorConfig
 
     color_dict_without_index = {
-        (keyword.no_exec, keyword.ctrl): ColorConfig.normal_blue,
-        (keyword.no_exec, keyword.mr): ColorConfig.orange,
-        (keyword.no_exec, keyword.tau): ColorConfig.light_bright_mixed_mid_red,
-        (keyword.no_exec, keyword.mr_tau): ColorConfig.light_green,
-        (keyword.with_exec, keyword.ctrl): ColorConfig.dark_blue,
-        (keyword.with_exec, keyword.mr): ColorConfig.dark_orange,
-        (keyword.with_exec, keyword.tau): ColorConfig.mid_red,
-        (keyword.with_exec, keyword.mr_tau): ColorConfig.green,
+        keyword.ctrl: ColorConfig.normal_blue,
+        keyword.sema: ColorConfig.orange,
     }
     color_order_dict = {}
     total_index = 0
-    each_group_replicate_num = 3
-    for (exercise_name, condition_name), color in color_dict_without_index.items():
+    each_group_replicate_num = 6
+    for condition_name, color in color_dict_without_index.items():
         for current_index in range(1, 1 + each_group_replicate_num):
-            color_order_dict[(exercise_name, condition_name, current_index)] = (total_index + current_index, color)
+            color_order_dict[(condition_name, current_index)] = (total_index + current_index, color)
         total_index += each_group_replicate_num
 
     return_parameter_list = []
     if target == Keywords.mid_prediction:
         for result_label, current_result_information_dict in complete_result_information_dict.items():
             major_key = data_name
-            # exercise = current_result_information_dict[keyword.exercise]
-            # exer_str = '+' if exercise == keyword.with_exec else '-'
-            exer_str = result_label[-1]
-            exercise = keyword.with_exec if exer_str == '+' else keyword.no_exec
             condition = current_result_information_dict[keyword.condition]
             index = current_result_information_dict[keyword.index]
             minor_key_list = []
-            minor_key_str = f'{condition}_{index}{exer_str}'
-            if index == average_str:
-                color_index = 1
-            else:
-                color_index = index
-            order_index, current_color = color_order_dict[(exercise, condition, color_index)]
+            minor_key_str = f'{condition}_{index}'
+            order_index, current_color = color_order_dict[(condition, index)]
             return_parameter_list.append(
                 (result_label, major_key, minor_key_list, minor_key_str, current_color, order_index))
     elif target == Keywords.flux_comparison:
         for result_label, current_result_information_dict in complete_result_information_dict.items():
             major_key = data_name
-            # exercise = current_result_information_dict[keyword.exercise]
-            # exer_str = '+' if exercise == keyword.with_exec else '-'
-            exer_str = result_label[-1]
-            exercise = keyword.with_exec if exer_str == '+' else keyword.no_exec
             condition = current_result_information_dict[keyword.condition]
             index = current_result_information_dict[keyword.index]
             minor_key_list = []
-            minor_key_str = f'{condition}_{index}{exer_str}'
-            if index == average_str:
-                color_index = 1
-            else:
-                color_index = index
-            order_index, current_color = color_order_dict[(exercise, condition, color_index)]
+            minor_key_str = f'{condition}_{index}'
+            order_index, current_color = color_order_dict[(condition, index)]
             return_parameter_list.append(
                 (result_label, major_key, minor_key_list, minor_key_str, current_color, order_index))
     else:
@@ -162,12 +140,6 @@ def result_process_figure_config_dict_generator():
         'predicted_mid_figure_config_dict': figure_config_dict,
         'flux_comparison_figure_config_dict': figure_config_dict,
     }
-
-flux_name_list_in_one_tissue = [
-    ['GLC_input', ('FBA_c', 'FBA_c__R'), 'PYK_c', 'LAC_output'],
-    ['CS_m', 'AKGD_m', ('MDH_m', 'MDH_m__R'), 'ALA_input'],
-]
-
 
 display_flux_name_dict = {
     ('LDH_e', 'LDH_e__R'): 'LDH_e net',
@@ -197,39 +169,40 @@ def tissue_mid_name_list_dict_constructor(current_model_name=model_name, **kwarg
             'malate', 'aspartate', ],'gut--citrate/isocitrate'
     ]
 
-    if current_model_name == ModelList.complete_model_whole_body:
-        tissue = keyword.whole_body
-    elif current_model_name == ModelList.complete_model_gut:
-        tissue = keyword.gut
-    else:
-        raise ValueError()
     base_tissue_mid_name_list_dict = {
-        tissue: mid_name_list_in_one_tissue,
+        ModelKeyword.serum: mid_name_list_in_serum,
+        ModelKeyword.liver: mid_name_list_in_one_tissue,
+        ModelKeyword.cortex: mid_name_list_in_one_tissue,
     }
     tissue_mid_name_list_dict = base_tissue_mid_name_list_dict
     return tissue_mid_name_list_dict, keyword.display_mid_name_dict, keyword.display_tissue_name_dict
 
 
 def tissue_flux_name_list_dict_constructor(current_model_name=model_name, **kwargs):
-    if current_model_name == ModelList.complete_model_whole_body:
-        tissue = keyword.whole_body
-    elif current_model_name == ModelList.complete_model_gut:
-        tissue = keyword.gut
-    else:
-        raise ValueError()
+
+    flux_name_list_in_serum = [
+        ['GLYCOLYSIS_c', ('LDH_e', 'LDH_e__R'), ],
+    ]
+
+    flux_name_list_in_one_tissue = [
+        [('GLC_exchange', 'GLC_exchange__R'), ('FBA_c', 'FBA_c__R'), 'PYK_c', ('LDH_c', 'LDH_c__R'),
+         ('LAC_exchange', 'LAC_exchange__R'), 'PHGDH_PSAT_PSP_c', ('SER_exchange', 'SER_exchange__R')],
+        [('GLYCEROL_exchange', 'GLYCEROL_exchange__R'), 'BHB_input', 'FA_usage',
+         'CS_m', 'AKGD_m', ('MDH_m', 'MDH_m__R'), ('ALA_exchange', 'ALA_exchange__R')],
+    ]
+
+    flux_name_list_in_liver = [
+        [('GLC_exchange', 'GLC_exchange__R'), ('FBA_c', 'FBA_c__R'), 'PYK_c', ('LDH_c', 'LDH_c__R'),
+         ('LAC_exchange', 'LAC_exchange__R'), 'BHB_output'],
+        ['CS_m', 'AKGD_m', ('MDH_m', 'MDH_m__R'), ('ALA_exchange', 'ALA_exchange__R')],
+    ]
+
     all_tissue_flux_name_list_dict = {
-        tissue: flux_name_list_in_one_tissue,
+        ModelKeyword.serum: flux_name_list_in_serum,
+        ModelKeyword.liver: flux_name_list_in_liver,
+        ModelKeyword.cortex: flux_name_list_in_one_tissue,
     }
     specific_tissue_reversible_flux_pair_dict = {
-        tissue: [
-            # ('GLC_input', 'GLC_output'),
-            # ('GLU_input', 'GLU_output'),
-            # ('GLN_input', 'GLN_output'),
-            # ('ASP_input', 'ASP_output'),
-            # ('PYR_input', 'PYR_output'),
-            # ('SER_input', 'SER_output'),
-            # ('ALA_input', 'ALA_output'),
-        ],
     }
     return all_tissue_flux_name_list_dict, display_flux_name_dict, specific_tissue_reversible_flux_pair_dict
 

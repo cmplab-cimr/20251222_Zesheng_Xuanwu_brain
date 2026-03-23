@@ -249,6 +249,7 @@ class ParameterName(object):
     marker_size = 'marker_size'
     column_width = 'column_width'
     class_width = 'class_width'
+    gap_inside_column = 'gap_inside_column'
     color_dict = 'color_dict'
     selection_size = 'selection_size'
     selection_ratio = 'selection_ratio'
