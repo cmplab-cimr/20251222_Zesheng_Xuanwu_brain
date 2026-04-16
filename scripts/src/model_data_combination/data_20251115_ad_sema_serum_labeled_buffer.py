@@ -66,7 +66,7 @@ def return_data_content(running_mode, dataset_id=None, **kwargs):
 
 class UserDefinedMFASettings(OldUserDefinedMFASettings):
     optimization_num_for_each_suffix_dict = {
-        None: 5000,
+        None: 2000,
     }
     average_optimized_results = None
 
