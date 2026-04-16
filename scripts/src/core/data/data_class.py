@@ -407,6 +407,18 @@ def deconvolve_real_mid(raw_mid, all_chemical_formula_dict, minimal_mid):
     return real_mid
 
 
+def real_mid_correct_c13(real_mid_vector_with_natural_c13, carbon_num=None, minimal_mid=CoreConstants.eps_for_mid):
+    if carbon_num is None:
+        carbon_num = len(real_mid_vector_with_natural_c13) - 1
+    assert carbon_num < len(real_mid_vector_with_natural_c13)
+    natural_c13_isotope_vector = Atom.rare_isotope_vector_generator({Atom.carbon: carbon_num})
+    original_real_mid = slsqp_deconvolution_solving(
+        natural_c13_isotope_vector, real_mid_vector_with_natural_c13, len(real_mid_vector_with_natural_c13))
+    real_mid = np.maximum(original_real_mid, minimal_mid)
+    real_mid /= np.sum(real_mid)
+    return real_mid
+
+
 def slsqp_deconvolution_solving(effective_isotope_vector, measured_mid, real_mid_dim):
     def calculate_residue(x):
         return obj_matrix @ x - measured_mid
@@ -509,6 +521,13 @@ class MFAData(object):
             ratio_dict_to_objective_func=self.ratio_dict_to_objective_func,
         )
 
+    def add_input_metabolite_obj_dict(
+            self, new_labeled_buffer_input_metabolite_obj_dict):
+        self.input_metabolite_obj_data_dict = {
+            **self.input_metabolite_obj_data_dict,
+            **new_labeled_buffer_input_metabolite_obj_dict,
+        }
+
 
 def average_multiple_mfa_data(mfa_data_list, output_std=False, common_data_name=None, filter_excluded_from_mfa=False):
     def average_experimental_mid_data_obj_dict(mid_data_obj_dict_list):
@@ -554,3 +573,18 @@ def average_multiple_mfa_data(mfa_data_list, output_std=False, common_data_name=
         return new_mfa_data_obj
     else:
         return new_mfa_data_obj, std_mid_data_vector_dict
+
+
+def input_metabolite_obj_dict_batch_generator(
+        metabolite_name_carbon_num_list, isotope_label_ratio=0.99):
+    labeled_input_metabolite_dict = {
+        metabolite_name: InputMetaboliteData(
+            metabolite_name, [
+                {
+                    "ratio_list": [isotope_label_ratio] * carbon_num,
+                    "abundance": 1,
+                },
+            ])
+        for metabolite_name, carbon_num in metabolite_name_carbon_num_list
+    }
+    return labeled_input_metabolite_dict

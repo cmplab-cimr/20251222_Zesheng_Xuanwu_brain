@@ -125,7 +125,7 @@ class CompositeReaction(object):
         if isinstance(flux_range, str):
             self.flux_range = flux_range
             self.specific_range = None
-        elif isinstance(flux_range, tuple) or isinstance(flux_range, list):
+        elif isinstance(flux_range, tuple | list):
             if len(flux_range) != 2:
                 raise ValueError('Range of flux {} not recognized!: {}'.format(id, flux_range))
             self.flux_range = ModelKeyword.specific_range_type

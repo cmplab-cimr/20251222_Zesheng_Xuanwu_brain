@@ -1,4 +1,5 @@
 from .packages import np, pd, xlsxwriter
+from .config import Keywords as GeneralKeywords
 from ..core.common.functions import check_if_mix_flux, check_if_biomass_flux
 
 
@@ -10,16 +11,20 @@ index_and_title_format_dict = {
 
 workbook_option_dict = {'strings_to_formulas': False, 'strings_to_urls': False}
 
-
-class Keywords(object):
+class Keywords(GeneralKeywords):
     sheet_name = 'sheet_name'
     sheet_information_str = 'sheet_information'
+    result_information_str = 'result_information'
     complete_result_name_str = 'complete_result_name'
+    metabolite_name_str = 'metabolite_name'
+    mid_index_str = 'mid_index'
     data = 'data'
     index_name = 'Index'
     experiments = 'experiments'
     loss = 'loss'
     label = 'label'
+    mid_sheet_name = 'MID'
+    mid_correct_c13_sheet_name = 'MID_CORRECT_C13'
 
 
 def isdigit(number):
@@ -70,9 +75,10 @@ def excel_sheet_information_process(
 
 
 def sheet_information_output_to_excel_sheet(
-        target_workbook, sheet_information_dict, sheet_information_item_name_list=None):
+        target_workbook, sheet_information_dict, sheet_information_item_name_list=None,
+        sheet_name=Keywords.sheet_information_str):
     column_width_list = [35, 35, 20, 10, 10, 15]
-    sheet_information_ws = target_workbook.add_worksheet(name=Keywords.sheet_information_str)
+    sheet_information_ws = target_workbook.add_worksheet(name=sheet_name)
     title_format = target_workbook.add_format(index_and_title_format_dict)
     for column_index, column_width in enumerate(column_width_list):
         sheet_information_ws.set_column(column_index, column_index, column_width)
@@ -221,6 +227,87 @@ def output_raw_flux_data(
                 current_other_label_column_dict)
 
 
+def raw_comparison_output_to_excel_sheet(
+        target_workbook, sheet_name, flux_comparison_data_dict, other_label_column_dict, group_label='',
+        index_list=None):
+    """将 flux comparison 数据写入 Excel 的单个 sheet。
+
+    参数:
+        target_workbook: xlsxwriter Workbook 对象
+        sheet_name: 工作表名称
+        flux_comparison_data_dict: {flux_title: {'': {minor_key_str: (order_index, flux_array)}}}
+        other_label_column_dict: {label_name: list_of_values} 额外标签列，为空则跳过
+    """
+    index_column_width = 5
+    normal_flux_column_width = 18
+    current_ws = target_workbook.add_worksheet(name=sheet_name)
+    title_format = target_workbook.add_format(index_and_title_format_dict)
+
+    if other_label_column_dict is None:
+        other_label_column_dict = {}
+
+    max_solution_num = 0
+    data_column_num = 0
+    flux_title_str_list = []
+    minor_key_str_list = []
+    for flux_title, group_data_dict in flux_comparison_data_dict.items():
+        minor_data_dict = group_data_dict[group_label]
+        flux_title_str_list.append(flux_title)
+        flux_title_str_list.extend([None] * (len(minor_data_dict) - 1))
+        for minor_key, flux_array in minor_data_dict.items():
+            minor_key_str_list.append(minor_key)
+            max_solution_num = max(max_solution_num, len(flux_array))
+            data_column_num += 1
+
+    if index_list is None:
+        index_list = range(1, max_solution_num + 1)
+    index_column_num = len(other_label_column_dict) + 1
+    start_column_index = 0
+    current_ws.set_column(start_column_index, start_column_index + index_column_num - 1, index_column_width)
+    data_start_column = start_column_index + index_column_num
+    current_ws.set_column(data_start_column, data_start_column + data_column_num - 1, normal_flux_column_width)
+
+    complete_label_flux_title_list = [Keywords.index_name]
+    complete_label_flux_title_list.extend(other_label_column_dict.keys())
+    complete_label_flux_title_list.extend(flux_title_str_list)
+    current_ws.write_row(0, 0, complete_label_flux_title_list, title_format)
+    current_ws.write_row(1, index_column_num, minor_key_str_list, title_format)
+
+    start_row = 2
+    # 剩余行: 每个 solution 一行
+    for solution_index in range(max_solution_num):
+        row = solution_index + start_row
+        col = 0
+        current_ws.write(row, col, index_list[solution_index], title_format)
+        col += 1
+        # other_label 列
+        row_content_list = [
+            other_label_value_array[solution_index]
+            if solution_index < len(other_label_value_array) else None
+            for other_label_value_array in other_label_column_dict.values()
+        ]
+        for group_data_dict in flux_comparison_data_dict.values():
+            for flux_array in group_data_dict[group_label].values():
+                if solution_index < len(flux_array):
+                    row_content_list.append(flux_array[solution_index])
+                else:
+                    row_content_list.append(None)
+        current_ws.write_row(row, col, row_content_list)
+
+
+def output_flux_comparison_data(
+        output_xlsx_file_path, flux_comparison_data_dict, other_label_column_dict=None):
+    with xlsxwriter.Workbook(output_xlsx_file_path, options=workbook_option_dict) as workbook:
+        for major_key, each_major_key_flux_comparison_data_dict in flux_comparison_data_dict.items():
+            if other_label_column_dict is not None and major_key in other_label_column_dict:
+                current_other_label_column_dict = other_label_column_dict[major_key]
+            else:
+                current_other_label_column_dict = None
+            raw_comparison_output_to_excel_sheet(
+                workbook, replace_invalid_file_name(major_key),
+                each_major_key_flux_comparison_data_dict, current_other_label_column_dict)
+
+
 def experimental_and_predicted_mid_materials_generator(
         experimental_mid_data_dict=None, experimental_mid_column_name='experiment',
         mid_data_dict=None, extra_row_name_list_dict=None):
@@ -262,7 +349,7 @@ def experimental_and_predicted_mid_materials_generator(
         return _guide_metabolite_name_list, _mid_vector_array, _mid_dim, _vector_num
 
     guide_metabolite_name_list = None
-    sheet_column_name_list = ['metabolite_name', 'mid_index']
+    sheet_column_name_list = [Keywords.metabolite_name_str, Keywords.mid_index_str]
     output_metabolite_name_list = []
     mid_index_list = []
     extra_row_value_array = None
@@ -305,10 +392,10 @@ def experimental_and_predicted_mid_materials_generator(
 
 def experimental_and_predicted_mid_output_to_excel_sheet(
         target_workbook, sheet_name, sheet_column_name_list, output_metabolite_name_list, mid_index_list,
-        final_numeric_array):
-    metabolite_name_width = 20
-    metabolite_index_width = 10
-    mid_value_width = 15
+        final_numeric_array, metabolite_name_width=20, metabolite_index_width=10, mid_value_width=15):
+    # metabolite_name_width = 20
+    # metabolite_index_width = 10
+    # mid_value_width = 15
     sheet_information_ws = target_workbook.add_worksheet(name=sheet_name)
     title_format = target_workbook.add_format(index_and_title_format_dict)
 
@@ -372,4 +459,105 @@ def output_predicted_mid_data(
                 workbook, sheet_name, sheet_column_name_list, output_metabolite_name_list, mid_index_list,
                 final_numeric_array)
 
+
+def output_raw_experimental_mid_data(
+        output_xlsx_file_path, complete_experimental_mfa_data_obj_dict, final_information_dict,
+        other_label_row_dict=None):
+    def raw_experimental_mid_data_dict_generator(
+            current_experimental_mfa_data_obj, parent_common_metabolite_index_list_dict,
+            parent_common_metabolite_mid_dim_dict):
+        this_result_mid_data_dict = {}
+        this_result_mid_correct_carbon_dict = {}
+        for metabolite_index, (metabolite_name, mid_data_obj) in enumerate(
+                current_experimental_mfa_data_obj.experimental_mid_data_obj_dict.items()):
+            this_mid_vector = mid_data_obj.data_vector
+            if metabolite_name not in parent_common_metabolite_index_list_dict:
+                parent_common_metabolite_index_list_dict[metabolite_name] = []
+                parent_common_metabolite_mid_dim_dict[metabolite_name] = len(this_mid_vector)
+            parent_common_metabolite_index_list_dict[metabolite_name].append(metabolite_index)
+            this_mid_correct_carbon_vector = real_mid_correct_c13(this_mid_vector)
+            this_result_mid_data_dict[metabolite_name] = this_mid_vector
+            this_result_mid_correct_carbon_dict[metabolite_name] = this_mid_correct_carbon_vector
+        return this_result_mid_data_dict, this_result_mid_correct_carbon_dict
+
+    def data_final_numeric_array_generator(
+            current_result_label_list, current_data_dict, parent_common_metabolite_name_dim_list):
+        current_transformed_numeric_array = []
+        for result_label in current_result_label_list:
+            current_result_data_dict = current_data_dict[result_label]
+            current_result_mid_list = []
+            for metabolite_name, mid_dim in parent_common_metabolite_name_dim_list:
+                if metabolite_name in current_result_data_dict:
+                    current_result_mid_list.append(current_result_data_dict[metabolite_name])
+                else:
+                    current_result_mid_list.append(np.zeros(mid_dim))
+            current_result_mid_array = np.concatenate(current_result_mid_list)
+            assert len(current_result_mid_array) == total_metabolite_dim
+            current_transformed_numeric_array.append(current_result_mid_array)
+        current_numeric_array = np.array(current_transformed_numeric_array).T
+        return current_numeric_array
+
+    from ..core.data.data_class import real_mid_correct_c13
+    mid_data_dict = {}
+    mid_data_correct_carbon_dict = {}
+    common_metabolite_index_list_dict = {}
+    common_metabolite_mid_dim_dict = {}
+    tmp_sheet_name_dict = {}
+    raw_result_information_dict = {}
+    result_label_list = []
+    max_result_label_len = 0
+    for result_label, experimental_mfa_data_obj in complete_experimental_mfa_data_obj_dict.items():
+        (
+            mid_data_dict[result_label], mid_data_correct_carbon_dict[result_label]
+        ) = raw_experimental_mid_data_dict_generator(
+            experimental_mfa_data_obj, common_metabolite_index_list_dict, common_metabolite_mid_dim_dict)
+        excel_sheet_information_process(
+            result_label, final_information_dict[result_label], tmp_sheet_name_dict, raw_result_information_dict,
+            pandas=False)
+        result_label_list.append(result_label)
+        max_result_label_len = max(max_result_label_len, len(result_label))
+    result_information_dict = {}
+    for result_label, tmp_sheet_name in tmp_sheet_name_dict.items():
+        current_raw_information_dict = raw_result_information_dict[tmp_sheet_name]
+        result_information_dict[result_label] = {
+            key: value for key, value in current_raw_information_dict.items()
+            if key != Keywords.sheet_name}
+    common_metabolite_average_index_dict = {
+        metabolite_name: np.mean(index_list) for metabolite_name, index_list in common_metabolite_index_list_dict.items()
+    }
+    common_metabolite_name_dim_list = []
+    output_metabolite_name_list = []
+    mid_index_list = []
+    total_metabolite_dim = 0
+    max_metabolite_name_len = 0
+    for metabolite_name, _ in sorted(
+            common_metabolite_average_index_dict.items(), key=lambda x: x[1]):
+        current_mid_dim = common_metabolite_mid_dim_dict[metabolite_name]
+        mid_index_list.extend(range(current_mid_dim))
+        output_metabolite_name_list.extend([metabolite_name] * current_mid_dim)
+        common_metabolite_name_dim_list.append((metabolite_name, current_mid_dim))
+        total_metabolite_dim += current_mid_dim
+        max_metabolite_name_len = max(max_metabolite_name_len, len(metabolite_name))
+    if max_metabolite_name_len > 21:
+        metabolite_name_width = 30
+    else:
+        metabolite_name_width = 20
+    if max_result_label_len > 18:
+        result_label_width = 20
+    else:
+        result_label_width = 15
+    sheet_column_name_list = [
+        Keywords.metabolite_name_str, Keywords.mid_index_str, *result_label_list]
+    with xlsxwriter.Workbook(output_xlsx_file_path, options=workbook_option_dict) as workbook:
+        sheet_information_output_to_excel_sheet(
+            workbook, result_information_dict, sheet_name=Keywords.result_information_str)
+        for sheet_name, data_dict in zip(
+                [Keywords.mid_sheet_name, Keywords.mid_correct_c13_sheet_name],
+                [mid_data_dict, mid_data_correct_carbon_dict]):
+            final_numeric_array = data_final_numeric_array_generator(
+                result_label_list, data_dict, common_metabolite_name_dim_list)
+            experimental_and_predicted_mid_output_to_excel_sheet(
+                workbook, sheet_name, sheet_column_name_list, output_metabolite_name_list, mid_index_list,
+                final_numeric_array, metabolite_name_width=metabolite_name_width,
+                mid_value_width=result_label_width)
 

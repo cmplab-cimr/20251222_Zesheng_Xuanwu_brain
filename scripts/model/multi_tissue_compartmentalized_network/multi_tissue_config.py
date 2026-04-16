@@ -40,3 +40,20 @@ liver_cortex_model_dict = {
     #         basic_tissue_compartmentalized_model, adipose_specific_model, standard_name_dict),
     #     ketone_body_utilization_specific_compartmentalized_model, standard_name_dict),
 }
+
+def liver_cortex_model_with_serum_labeled_buffer_generator():
+    from . import serum_metabolite_labeled_supplement_model
+    from scripts.src.core.data.data_class import input_metabolite_obj_dict_batch_generator
+    labeled_buffer_input_metabolite_obj_dict = input_metabolite_obj_dict_batch_generator(
+        serum_metabolite_labeled_supplement_model.labeled_buffer_metabolite_name_carbon_num_list)
+    serum_model = model_combine_constructor(
+        serum_specific_model, serum_metabolite_labeled_supplement_model, standard_name_dict)
+    liver_cortex_model_with_serum_labeled_buffer_dict = {
+        ModelKeyword.serum: serum_model,
+
+        ModelKeyword.liver: typical_liver_model_constructor(),
+        ModelKeyword.cortex: typical_brain_model_constructor(),
+    }
+    return (
+        liver_cortex_model_with_serum_labeled_buffer_dict,
+        labeled_buffer_input_metabolite_obj_dict)

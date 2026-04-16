@@ -2,9 +2,13 @@ from .common.packages import ValueEnum
 
 
 class ExperimentName(ValueEnum):
-    example_data_20250815 = 'data_20251115_ad_sema'
+    data_20251115_ad_sema = 'data_20251115_ad_sema'
+    data_20251115_ad_sema_serum_labeled_buffer = 'data_20251115_ad_sema_serum_labeled_buffer'
+    data_20251115_ad_sema_single_tissue_model = 'data_20251115_ad_sema_single_tissue_model'
 
-default_data_model_name = ExperimentName.example_data_20250815
+# default_data_model_name = ExperimentName.data_20251115_ad_sema
+default_data_model_name = ExperimentName.data_20251115_ad_sema_serum_labeled_buffer
+# default_data_model_name = ExperimentName.data_20251115_ad_sema_single_tissue_model
 
 
 class MLRunningMode(ValueEnum):
@@ -20,6 +24,10 @@ class MFARunningMode(ValueEnum):
 
 
 data_model_comment = {
-    ExperimentName.example_data_20250815:
+    ExperimentName.data_20251115_ad_sema:
+        'Data from mice',
+    ExperimentName.data_20251115_ad_sema_serum_labeled_buffer:
+        'Data from mice',
+    ExperimentName.data_20251115_ad_sema_single_tissue_model:
         'Data from mice',
 }

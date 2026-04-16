@@ -35,12 +35,15 @@ def specific_data_dict_loader(specific_parameter, reload=False, **kwargs):
         tissue_mid_name_list_dict_constructor, final_result_information_dict, experimental_figure_config_dict)
 
 
-def common_data_loader(data_type, **kwargs):
+def common_data_loader(data_type, keyword_only=False, **kwargs):
     if data_type == DataSource.data_20251115_ad_sema:
         from .data_20251115_ad_sema.specific_data_parameters import SpecificParameters, Keyword
     else:
         raise ValueError()
-    specific_parameters = SpecificParameters()
-    content = specific_data_dict_loader(specific_parameters, **kwargs)
+    if not keyword_only:
+        specific_parameters = SpecificParameters()
+        content = specific_data_dict_loader(specific_parameters, **kwargs)
+    else:
+        content = None
     keyword = Keyword()
     return content, keyword

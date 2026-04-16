@@ -11,7 +11,8 @@ from ..io_functions.result_processing_functions import (
     experimental_data_plotting_func_template, experimental_mid_prediction_plotting_func_template,
     flux_comparison_plotting_func_template
 )
-from ..io_functions.result_output_functions import output_raw_flux_data, output_predicted_mid_data
+from ..io_functions.result_output_functions import (
+    output_raw_flux_data, output_predicted_mid_data, output_flux_comparison_data, output_raw_experimental_mid_data)
 
 from ..common.config import (
     Direct as CommonDirect, Keywords as GeneralKeywords, Color, FigureData, FigureDataKeywords,

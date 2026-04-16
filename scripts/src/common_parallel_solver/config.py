@@ -37,6 +37,8 @@ class Direct(object):
     flux_result_xlsx_filename = f'{Keywords.flux_raw_data}.xlsx'
     mid_result_xlsx_filename = f'{Keywords.mid_raw_data}.xlsx'
     solver_description_xlsx_filename = f'{Keywords.solver_descriptions}.xlsx'
+    flux_comparison_xlsx_file_name = f'{flux_comparison}.xlsx'
+    raw_mid_data_xlsx_file_name = f'experimental_result.xlsx'
 
     solution_array = 'solution_array'
     time_array = 'time_array'

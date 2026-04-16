@@ -2,6 +2,8 @@ from .config import (
     check_and_mkdir_of_direct, np, Keywords, FigureData, FigureDataKeywords, mid_name_process,
     tissue_specific_name_constructor, TransformDict, CoreConstants)
 from .plotting_functions import figure_plotting
+from .common_functions import (
+    tissue_specific_metabolite_mid_list_constructor)
 
 
 def add_empty_obj(root_dict, final_empty_class, *args):
@@ -37,7 +39,7 @@ def convert_tmp_data_to_final_data_dict(tmp_data_dict):
 
 
 def experimental_data_plotting_func_template(
-        mouse_id_mfa_data_dict, tissue_mid_name_list_dict_constructor, major_minor_key_analysis_func,
+        tissue_mid_name_list_dict_constructor, major_minor_key_analysis_func,
         major_key_file_name_func=lambda major_key: f'target_metabolites_{major_key}_labeling',
         legend_color_dict=None, **figure_param_dict):
     def preprocess_all_result_label_data(
@@ -527,17 +529,13 @@ def experimental_mid_prediction_plotting_func_template(
         tissue_mid_name_list_dict, display_mid_name_dict, display_tissue_name_dict = tissue_mid_name_list_dict_constructor(
             result_process=True)
 
-        result_information_dict_list = result_process_information_dict_analysis(
-            final_information_dict, target=Keywords.mid_prediction)
-        # Filter out information for results that are missing in the predicted data
-        result_information_dict_list = [
-            item for item in result_information_dict_list
-            if item[0] in complex_predicted_data_dict
-        ]
-
         for (
                 result_label, major_key, minor_key_list, minor_key_str, current_color, order_index
-        ) in result_information_dict_list:
+        ) in result_process_information_dict_analysis(final_information_dict, target=Keywords.mid_prediction):
+            # Filter out information for results that are missing in the predicted data
+            # (e.g. failed runs with 0 solutions)
+            if result_label not in complex_predicted_data_dict:
+                continue
             result_specific_predicted_data_dict = complex_predicted_data_dict[result_label]
             current_raw_emu_name_experimental_name_dict = solver_dict[result_label].emu_name_experimental_name_dict
             current_emu_name_experimental_name_dict = {
@@ -556,6 +554,7 @@ def experimental_mid_prediction_plotting_func_template(
                 experimental_key_str: (order_index + 0.5, current_color.transparency_mix(default_experimental_transparency)),
             })
             current_target_experimental_mid_data_dict = final_target_experimental_mid_data_dict[result_label]
+            # TODO: Need to mark the existing but manually excluded MFA data, similar with experimental_data_plotting.
 
             for mid_title, current_predicted_data_array_list in result_specific_predicted_data_dict.items():
                 if mid_title in mid_name_tissue_name_dict:
@@ -624,7 +623,6 @@ def experimental_mid_prediction_plotting_func_template(
         for major_key, current_formatted_mean_data in formatted_mean_data_dict.items():
             current_formatted_std_data = formatted_std_data_dict[major_key]
             # Import helper function for tissue-specific metabolite MID list construction
-            from ..mfa_analysis.common_functions import tissue_specific_metabolite_mid_list_constructor
             current_mid_name_list, current_mean_data_dict, current_std_data_dict = tissue_specific_metabolite_mid_list_constructor(
                 current_formatted_mean_data, current_formatted_std_data, data_len_dict, tissue_mid_name_list_dict)
             mean_data_dict[major_key] = current_formatted_mean_data
@@ -670,7 +668,7 @@ def common_flux_comparison_func(
             flux_title = flux_name
             flux_index = common_flux_name_index_dict[flux_name]
             calculated_flux_array = current_data_array[:, flux_index]
-        elif isinstance(flux_name, tuple) or isinstance(flux_name, list):
+        elif isinstance(flux_name, tuple | list):
             if callable(flux_name[1]):
                 flux_title, flux_func = flux_name
                 flux_name_value_dict = {
@@ -683,7 +681,7 @@ def common_flux_comparison_func(
                 flux_index1 = common_flux_name_index_dict[flux_name[0]]
                 flux_index2 = common_flux_name_index_dict[flux_name[1]]
                 calculated_flux_array = (
-                        current_data_array[:, flux_index1] - current_data_array[:, flux_index2])
+                    current_data_array[:, flux_index1] - current_data_array[:, flux_index2])
         else:
             raise ValueError()
         if flux_title not in data_dict_for_plotting:
@@ -694,6 +692,235 @@ def common_flux_comparison_func(
             data_dict_for_plotting[flux_title][extra_group_key_name][key_name] = (order_index, calculated_flux_array)
         else:
             data_dict_for_plotting[flux_title][key_name] = (order_index, calculated_flux_array)
+
+
+def obtain_current_specific_flux_array(
+        buffer_dict, final_flux_name_index_dict, final_solution_data_dict, subset_index_dict, result_label,
+        *tissue_flux_name_list):
+    def filter_subset_index(
+            _raw_solution_array, _subset_index_dict, _result_label, _flux_index):
+        if _subset_index_dict is not None:
+            _solution_array = _raw_solution_array[_subset_index_dict[_result_label], _flux_index]
+        else:
+            _solution_array = _raw_solution_array[:, _flux_index]
+        return _solution_array
+
+    def select_flux(
+            _current_tissue_flux_name_index_dict, _current_raw_solution_array, _subset_index_dict,
+            _result_label, _tissue_flux_name):
+        if _tissue_flux_name is None:
+            return None
+        elif (_result_label, _tissue_flux_name) in buffer_dict:
+            return buffer_dict[(_result_label, _tissue_flux_name)]
+        else:
+            try:
+                _current_flux_index = _current_tissue_flux_name_index_dict[_tissue_flux_name]
+            except KeyError:
+                _current_flux_array = None
+            else:
+                _current_flux_array = filter_subset_index(
+                    _current_raw_solution_array, _subset_index_dict, _result_label, _current_flux_index)
+            buffer_dict[(_result_label, _tissue_flux_name)] = _current_flux_array
+            return _current_flux_array
+
+    def obtain_one_result_label(
+            _final_flux_name_index_dict, _final_solution_data_dict, _subset_index_dict,
+            _result_label, _tissue_flux_name_list):
+        _current_tissue_flux_name_index_dict = _final_flux_name_index_dict[_result_label]
+        _current_raw_solution_array = _final_solution_data_dict[_result_label]
+        if len(_tissue_flux_name_list) == 0:
+            _tissue_flux_name_list = _current_tissue_flux_name_index_dict.keys()
+        _flux_array_list = []
+        for _tissue_flux_name in _tissue_flux_name_list:
+            _current_flux_array = select_flux(
+                _current_tissue_flux_name_index_dict, _current_raw_solution_array, _subset_index_dict,
+                _result_label, _tissue_flux_name
+            )
+            _flux_array_list.append(_current_flux_array)
+        return _flux_array_list, _tissue_flux_name_list
+
+
+    if isinstance(result_label, str):
+        flux_array_list, new_tissue_flux_name_list = obtain_one_result_label(
+            final_flux_name_index_dict, final_solution_data_dict, subset_index_dict, result_label,
+            tissue_flux_name_list)
+    elif isinstance(result_label, tuple | list):
+        total_num_list = []
+        tissue_flux_num = len(tissue_flux_name_list)
+        all_flux_array_list = []
+        new_tissue_flux_name_list = None
+        for each_result_label in result_label:
+            this_result_label_flux_array_list, this_result_label_new_tissue_flux_name_list = obtain_one_result_label(
+                final_flux_name_index_dict, final_solution_data_dict, subset_index_dict, each_result_label,
+                tissue_flux_name_list)
+            if tissue_flux_num == 0:
+                tissue_flux_num = len(this_result_label_new_tissue_flux_name_list)
+                new_tissue_flux_name_list = this_result_label_new_tissue_flux_name_list
+            else:
+                assert tissue_flux_num == len(this_result_label_new_tissue_flux_name_list)
+            if len(all_flux_array_list) == 0:
+                all_flux_array_list = [[] for _ in range(tissue_flux_num)]
+                total_num_list = [0 for _ in range(tissue_flux_num)]
+            for flux_order_index in range(tissue_flux_num):
+                each_flux_array = this_result_label_flux_array_list[flux_order_index]
+                this_flux_each_flux_array_list = all_flux_array_list[flux_order_index]
+                if each_flux_array is not None:
+                    this_flux_each_flux_array_list.append(each_flux_array)
+                    this_solution_num = each_flux_array.shape[0]
+                    total_num_list[flux_order_index] += this_solution_num
+        flux_array_list = [
+            np.concatenate(each_flux_array_list, axis=0) if len(each_flux_array_list) > 0 else None
+            for each_flux_array_list in all_flux_array_list
+        ]
+    else:
+        raise ValueError()
+
+    return flux_array_list, new_tissue_flux_name_list
+
+
+def process_each_result_label(
+        buffer_dict, result_label, final_solution_data_dict, final_flux_name_index_dict, subset_index_dict,
+        all_tissue_flux_name_list_dict, display_flux_dict, display_tissue_dict,
+        final_flux_name_nested_list, tissue_specific_display_flux_dict):
+    def tissue_flux_label_generator(
+            _tissue_name, _flux_name_without_tissue_0, _flux_name_without_tissue_1=None):
+        if _flux_name_without_tissue_1 is None:
+            _tissue_flux_name = tissue_specific_name_constructor(_flux_name_without_tissue_0, _tissue_name)
+            _flux_label = _tissue_flux_name
+        else:
+            _flux_label_without_tissue = f'{_flux_name_without_tissue_0} - {_flux_name_without_tissue_1}'
+            _flux_label = tissue_specific_name_constructor(_flux_label_without_tissue, _tissue_name)
+            _tissue_flux_name_0 = tissue_specific_name_constructor(_flux_name_without_tissue_0, _tissue_name)
+            _tissue_flux_name_1 = tissue_specific_name_constructor(_flux_name_without_tissue_1, _tissue_name)
+            _tissue_flux_name = (_tissue_flux_name_0, _tissue_flux_name_1)
+        return _flux_label, _tissue_flux_name
+
+    def tissue_display_flux_name_generator(
+            _display_flux_dict, _display_tissue_dict,
+            _tissue_name, _flux_name_without_tissue_0, _flux_name_without_tissue_1=None,):
+        if _tissue_name in _display_tissue_dict:
+            _display_tissue = _display_tissue_dict[_tissue_name]
+        else:
+            _display_tissue = _tissue_name
+        if _flux_name_without_tissue_1 is None:
+            if _flux_name_without_tissue_0 in _display_flux_dict:
+                _display_flux_name = _display_flux_dict[_flux_name_without_tissue_0]
+            else:
+                _display_flux_name = _flux_name_without_tissue_0
+        else:
+            flux_pair_tuple = (_flux_name_without_tissue_0, _flux_name_without_tissue_1)
+            if flux_pair_tuple in _display_flux_dict:
+                _display_flux_name = _display_flux_dict[flux_pair_tuple]
+            elif _flux_name_without_tissue_0 in _display_flux_dict:
+                _display_flux_name = f'{_display_flux_dict[_flux_name_without_tissue_0]}_net'
+            else:
+                _display_flux_name = ' - '.join(flux_pair_tuple)
+        _display_tissue_flux_name = f'{_display_tissue}: {_display_flux_name}'
+        return _display_tissue_flux_name
+
+    def reversible_flux_label_constructor(_flux_name_tuple, _tissue_name):
+        if isinstance(_flux_name_tuple[1], str):
+            # flux_name_tuple = (flux_name_without_tissue_0, flux_name_without_tissue_1)
+            _flux_label, (_tissue_flux_name_0, _tissue_flux_name_1) = tissue_flux_label_generator(
+                _tissue_name, *_flux_name_tuple)
+            _display_tissue_flux_name = tissue_display_flux_name_generator(
+                display_flux_dict, display_tissue_dict,
+                _tissue_name, *_flux_name_tuple)
+        elif isinstance(_flux_name_tuple[1], tuple | list):
+            assert isinstance(_flux_name_tuple[0], str)
+            assert len(_flux_name_tuple[1]) == 2
+            (_flux_label, _flux_pair_tuple) = _flux_name_tuple
+            _, (_tissue_flux_name_0, _tissue_flux_name_1) = tissue_flux_label_generator(
+                _tissue_name, *_flux_pair_tuple)
+            _display_tissue_flux_name = tissue_display_flux_name_generator(
+                display_flux_dict, display_tissue_dict,
+                _tissue_name, *_flux_pair_tuple)
+        else:
+            raise ValueError()
+        return _flux_label, _display_tissue_flux_name, _tissue_flux_name_0, _tissue_flux_name_1
+
+    result_flux_dict = {}
+    if len(final_flux_name_nested_list) == 0:
+        add_flux_name_state = True
+    else:
+        add_flux_name_state = False
+
+    total_row_index = 0
+    for tissue_name, each_tissue_flux_name_nested_list in all_tissue_flux_name_list_dict.items():
+        for each_tissue_flux_name_list in each_tissue_flux_name_nested_list:
+            each_row_flux_label_list = []
+            for flux_name_without_tissue in each_tissue_flux_name_list:
+                if isinstance(flux_name_without_tissue, str):
+                    flux_label, tissue_flux_name = tissue_flux_label_generator(tissue_name, flux_name_without_tissue)
+                    (calculated_flux_array, ), _ = obtain_current_specific_flux_array(
+                        buffer_dict, final_flux_name_index_dict, final_solution_data_dict,
+                        subset_index_dict, result_label, tissue_flux_name)
+                    if calculated_flux_array is None:
+                        flux_label = None
+                        flux_display_name = None
+                    else:
+                        flux_display_name = tissue_display_flux_name_generator(
+                            display_flux_dict, display_tissue_dict, tissue_name, flux_name_without_tissue)
+                elif isinstance(flux_name_without_tissue, tuple | list):
+                    if len(flux_name_without_tissue) == 2:
+                        # flux_title = '{} - {}'.format(flux_name[0], flux_name[1])
+                        (
+                            flux_label, flux_display_name, tissue_flux_name_0, tissue_flux_name_1
+                        ) = reversible_flux_label_constructor(flux_name_without_tissue, tissue_name)
+
+                        (calculated_flux_array_0, calculated_flux_array_1), _ = obtain_current_specific_flux_array(
+                            buffer_dict, final_flux_name_index_dict, final_solution_data_dict,
+                            subset_index_dict, result_label, tissue_flux_name_0, tissue_flux_name_1)
+                        if calculated_flux_array_0 is not None and calculated_flux_array_1 is not None:
+                            calculated_flux_array = calculated_flux_array_0 - calculated_flux_array_1
+                        else:
+                            flux_label = None
+                            flux_display_name = None
+                            calculated_flux_array = None
+                    elif len(flux_name_without_tissue) == 3 and callable(flux_name_without_tissue[2]):
+                        flux_label, flux_display_name, flux_func = flux_name_without_tissue
+                        flux_array_list, new_tissue_flux_name_list = obtain_current_specific_flux_array(
+                            buffer_dict, final_flux_name_index_dict, final_solution_data_dict,
+                            subset_index_dict, result_label, )
+                        tissue_flux_name_value_dict = {
+                            tmp_tissue_flux_name: flux_array
+                            for tmp_tissue_flux_name, flux_array in zip(new_tissue_flux_name_list, flux_array_list)
+                        }
+                        calculated_flux_array = flux_func(tissue_flux_name_value_dict)
+                    else:
+                        raise ValueError()
+                else:
+                    raise ValueError()
+                if flux_label is not None:
+                    assert flux_label not in result_flux_dict
+                    result_flux_dict[flux_label] = calculated_flux_array
+                    if add_flux_name_state:
+                        tissue_specific_display_flux_dict[flux_label] = flux_display_name
+                    else:
+                        assert tissue_specific_display_flux_dict[flux_label] == flux_display_name
+                each_row_flux_label_list.append(flux_label)
+            if add_flux_name_state:
+                final_flux_name_nested_list.append(each_row_flux_label_list)
+            else:
+                existing_row_flux_label_list = final_flux_name_nested_list[total_row_index]
+                assert len(existing_row_flux_label_list) == len(each_row_flux_label_list)
+                new_row_flux_label_list = []
+                for col_index, (existing_flux_label, new_flux_label) in enumerate(
+                        zip(existing_row_flux_label_list, each_row_flux_label_list)):
+                    if existing_flux_label is not None and new_flux_label is not None:
+                        assert existing_flux_label == new_flux_label
+                    elif existing_flux_label is None and new_flux_label is not None:
+                        new_list_len = len(new_row_flux_label_list)
+                        if new_list_len < col_index:
+                            new_row_flux_label_list.extend(existing_row_flux_label_list[new_list_len:col_index])
+                            new_row_flux_label_list.append(new_flux_label)
+                if len(new_row_flux_label_list) > 0:
+                    new_list_len = len(new_row_flux_label_list)
+                    new_row_flux_label_list.extend(existing_row_flux_label_list[new_list_len:])
+                    final_flux_name_nested_list[total_row_index] = new_row_flux_label_list
+            total_row_index += 1
+
+    return (result_flux_dict, )
 
 
 def flux_comparison_plotting_func_template(
@@ -707,82 +934,95 @@ def flux_comparison_plotting_func_template(
     Similar pattern to experimental_data_plotting_func_template.
     """
 
-    def preprocess_flux_data(
-            solution_array_dict, final_flux_name_index_dict, subset_index_dict):
-        """Preprocess flux data for all result labels."""
-        (
-            all_tissue_flux_name_list_dict, display_flux_dict, specific_tissue_reversible_flux_pair_dict
-        ) = tissue_flux_name_list_dict_constructor()
-
-        preprocessed_flux_data_dict = {}
-        for result_label, current_solution_array in solution_array_dict.items():
-            current_flux_name_index_dict = final_flux_name_index_dict[result_label]
-            reversible_flux_pair_dict, all_flux_name_list = reversible_flux_pair_dict_generator(
-                current_flux_name_index_dict, flux_name_tissue_name_dict, specific_tissue_reversible_flux_pair_dict)
-            if subset_index_dict is not None:
-                target_solution_array = current_solution_array[subset_index_dict[result_label], :]
-            else:
-                target_solution_array = current_solution_array
-            preprocessed_flux_data_dict[result_label] = (
-                current_flux_name_index_dict, all_flux_name_list, target_solution_array)
-
-        return preprocessed_flux_data_dict, all_tissue_flux_name_list_dict, display_flux_dict
-
     def flux_comparison_plotting(
             experiment_name, solution_array_dict, final_flux_name_index_dict, final_information_dict,
             flux_comparison_output_direct, subset_index_dict=None):
         """Main plotting function that processes data and generates figures."""
-        preprocessed_flux_data_dict, all_tissue_flux_name_list_dict, display_flux_dict = preprocess_flux_data(
-            solution_array_dict, final_flux_name_index_dict, subset_index_dict)
+        # preprocessed_flux_data_dict, all_tissue_flux_name_list_dict, display_flux_dict = preprocess_flux_data(
+        #     solution_array_dict, final_flux_name_index_dict, subset_index_dict)
 
+        tissue_tissue_flux_name_list_dict_info = tissue_flux_name_list_dict_constructor()
+        if len(tissue_tissue_flux_name_list_dict_info) == 5:
+            (
+                all_tissue_flux_name_list_dict, display_flux_dict, display_tissue_dict,
+                specific_tissue_reversible_flux_pair_dict, flux_process_map_func
+            ) = tissue_tissue_flux_name_list_dict_info
+        elif len(tissue_tissue_flux_name_list_dict_info) == 4:
+            (
+                all_tissue_flux_name_list_dict, display_flux_dict, display_tissue_dict,
+                specific_tissue_reversible_flux_pair_dict,
+            ) = tissue_tissue_flux_name_list_dict_info
+            flux_process_map_func = None
+        elif len(tissue_tissue_flux_name_list_dict_info) == 3:
+            (
+                all_tissue_flux_name_list_dict, display_flux_dict,
+                specific_tissue_reversible_flux_pair_dict,
+            ) = tissue_tissue_flux_name_list_dict_info
+            display_tissue_dict = {}
+            flux_process_map_func = None
+        else:
+            raise ValueError()
+
+        final_flux_name_nested_list = []
+        tissue_specific_display_flux_dict = {}
+        processed_result_dict = {}
         extra_group_key_name = ''
         tmp_organized_mouse_data_dict = {}
         tmp_color_dict = {}
         tmp_name_dict = {}
+        buffer_dict = {}
         for (
                 result_label, major_key, minor_key_list, minor_key_str, current_color, order_index
         ) in result_process_information_dict_analysis(final_information_dict, target=Keywords.flux_comparison):
-            (
-                current_flux_name_index_dict, all_flux_name_list, target_solution_array
-            ) = preprocessed_flux_data_dict[result_label]
+            if result_label in processed_result_dict:
+                processed_result = processed_result_dict[result_label]
+            else:
+                processed_result = process_each_result_label(
+                    buffer_dict, result_label, solution_array_dict, final_flux_name_index_dict, subset_index_dict,
+                    all_tissue_flux_name_list_dict, display_flux_dict, display_tissue_dict,
+                    final_flux_name_nested_list, tissue_specific_display_flux_dict)
+                processed_result_dict[result_label] = processed_result
+            (processed_flux_value_dict, ) = processed_result
+
             if major_key not in tmp_organized_mouse_data_dict:
                 tmp_organized_mouse_data_dict[major_key] = {}
                 tmp_color_dict[major_key] = {}
                 tmp_name_dict[major_key] = {}
             tmp_color_dict[major_key][minor_key_str] = (order_index, current_color)
             tmp_name_dict[major_key][minor_key_str] = (order_index, minor_key_str)
-            common_flux_comparison_func(
-                all_flux_name_list, current_flux_name_index_dict, target_solution_array,
-                tmp_organized_mouse_data_dict[major_key], minor_key_str, order_index,
-                extra_group_key_name=extra_group_key_name,
-                reversible_flux_title_constructor=tissue_specific_reversible_flux_title_constructor_generator(
-                    flux_name_tissue_name_dict))
+            for flux_title, each_flux_data_array in processed_flux_value_dict.items():
+                if flux_process_map_func is not None:
+                    mapped_each_flux_data_array = flux_process_map_func(each_flux_data_array, major_key, minor_key_str)
+                else:
+                    mapped_each_flux_data_array = each_flux_data_array
+                current_flux_tuple = (order_index, mapped_each_flux_data_array)
+                if flux_title not in tmp_organized_mouse_data_dict[major_key]:
+                    tmp_organized_mouse_data_dict[major_key][flux_title] = {}
+                current_parent_data_dict = tmp_organized_mouse_data_dict[major_key][flux_title]
+                if extra_group_key_name not in current_parent_data_dict:
+                    current_parent_data_dict[extra_group_key_name] = {}
+                current_parent_data_dict[extra_group_key_name][minor_key_str] = current_flux_tuple
 
         organized_mouse_data_dict = {}
-        color_dict = {}
-        name_dict = {}
         for major_key, each_major_key_tmp_data_dict in tmp_organized_mouse_data_dict.items():
-            color_dict[major_key] = sort_dict_and_remove_sorting_index(tmp_color_dict[major_key])
-            name_dict[major_key] = sort_dict_and_remove_sorting_index(tmp_name_dict[major_key])
-            organized_mouse_data_dict[major_key] = {}
+            ordered_color_dict = sort_dict_and_remove_sorting_index(tmp_color_dict[major_key])
+            ordered_name_dict = sort_dict_and_remove_sorting_index(tmp_name_dict[major_key])
+            current_organized_mouse_data_dict = {}
             for flux_name, each_flux_data_dict in each_major_key_tmp_data_dict.items():
-                organized_mouse_data_dict[major_key][flux_name] = {
+                current_organized_mouse_data_dict[flux_name] = {
                     extra_group_key_name: sort_dict_and_remove_sorting_index(
                         each_flux_data_dict[extra_group_key_name])}
-
-        for major_key, current_data_dict in organized_mouse_data_dict.items():
-            from ..mfa_analysis.common_functions import tissue_specific_flux_list_constructor
-            current_flux_name_nested_list, tissue_specific_display_flux_dict = tissue_specific_flux_list_constructor(
-                all_tissue_flux_name_list_dict, display_flux_dict)
             figure_plotting.distribution_comparison_plotting(
                 figure_output_direct=flux_comparison_output_direct, figure_name=f'flux_comparison_{major_key}',
-                complete_data_dict=current_data_dict, flux_name_nested_list=current_flux_name_nested_list,
-                display_flux_dict=tissue_specific_display_flux_dict, name_dict=name_dict[major_key],
-                color_dict=color_dict[major_key], **figure_param_dict)
+                complete_data_dict=current_organized_mouse_data_dict, flux_name_nested_list=final_flux_name_nested_list,
+                display_flux_dict=tissue_specific_display_flux_dict, name_dict=ordered_name_dict,
+                color_dict=ordered_color_dict, **figure_param_dict)
+            organized_mouse_data_dict[major_key] = current_organized_mouse_data_dict
 
         figure_raw_data = FigureData(FigureDataKeywords.flux_comparison, experiment_name)
         figure_raw_data.save_data(
             organized_diet_mouse_data_dict=organized_mouse_data_dict,)
+        return organized_mouse_data_dict
 
     return flux_comparison_plotting
 

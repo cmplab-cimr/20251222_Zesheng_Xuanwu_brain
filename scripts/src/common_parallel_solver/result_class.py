@@ -27,6 +27,10 @@ class FinalResult(object):
                                                       f'{Direct.mid_result_xlsx_filename}'
         self.solver_descriptions_output_xlsx_path = f'{self.this_result_submitted_data_output_direct}/' \
                                                     f'{Direct.solver_description_xlsx_filename}'
+        self.flux_comparison_submitted_output_xlsx_path = f'{self.this_result_submitted_data_output_direct}/' \
+                                                          f'{Direct.flux_comparison_xlsx_file_name}'
+        self.raw_experimental_mid_data_submitted_output_xlsx_path = f'{self.this_result_submitted_data_output_direct}/' \
+                                                f'{Direct.raw_mid_data_xlsx_file_name}'
 
         check_and_mkdir_of_direct(self.experimental_data_output_direct)
         check_and_mkdir_of_direct(self.raw_result_data_output_direct)

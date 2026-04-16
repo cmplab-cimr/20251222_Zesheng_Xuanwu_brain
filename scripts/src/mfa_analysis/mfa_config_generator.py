@@ -7,7 +7,49 @@ from ..common_parallel_solver.config import Keywords as ParallelSolverKeywords
 from ..inventory import MFARunningMode
 
 
+class ModelDataSpecificSettings(object):
+    def __init__(
+            self,
+            user_defined_specific_flux_range_dict=None,
+            user_defined_constant_flux_dict=None,
+            data_content_parameter_dict=None):
+        if user_defined_specific_flux_range_dict is None:
+            user_defined_specific_flux_range_dict = {
+                'Salvage_c': (None, (1, 10)),
+                'G6PDH2R_PGL_GND_c': (None, (1, 200)),
+            }
+        self.user_defined_specific_flux_range_dict = user_defined_specific_flux_range_dict
+        if user_defined_constant_flux_dict is None:
+            user_defined_constant_flux_dict = {
+                'GLC_infuse': (ModelKeyword.serum, 100)
+            }
+        self.user_defined_constant_flux_dict = user_defined_constant_flux_dict
+        if data_content_parameter_dict is None:
+            data_content_parameter_dict = {}
+        self.data_content_parameter_dict = data_content_parameter_dict
+
+    def copy(self):
+        return ModelDataSpecificSettings(
+            user_defined_specific_flux_range_dict=dict(self.user_defined_specific_flux_range_dict),
+            user_defined_constant_flux_dict=dict(self.user_defined_constant_flux_dict),
+            data_content_parameter_dict=dict(self.data_content_parameter_dict)
+        )
+
+    def generate_mfa_config_parameter_dict(self, user_defined_model, mfa_model_obj):
+        return {
+            **self.__dict__,
+            'model_tissue_set': user_defined_model.model_tissue_set,
+            'flux_name_index_dict': mfa_model_obj.flux_name_index_dict,
+        }
+
+
 class MFASettings(object):
+    batch_size_str = 'batch_size'
+    each_portion_flux_num_str = 'each_portion_flux_num'
+    nnls_parallel_num_str = 'nnls_parallel_num'
+    emu_value_parallel_num_str = 'emu_value_parallel_num'
+    emu_gradient_hessian_parallel_num_str = 'emu_gradient_hessian_parallel_num'
+
     tf2_solver = False
 
     loss_percentile = 0.005
@@ -46,6 +88,7 @@ class MFASettings(object):
     debug = True
     slsqp_max_iter = 2000
 
+    common_tf2_batch_param_dict = {}
     final_process_parameter_dict = {}
 
     result_label_obj_value_dict = None
@@ -75,7 +118,7 @@ class MFASettings(object):
     @staticmethod
     def construct_tf2_slsqp_mfa_config(
             raw_slsqp_mfa_config, batch_size, each_portion_flux_num, nnls_parallel_num, emu_value_parallel_num,
-            emu_gradient_hessian_parallel_num, target_loss_value=None):
+            emu_gradient_hessian_parallel_num, target_loss_value=None, copy=True, **other_parameters):
         if target_loss_value is None:
             target_loss_value = 99999
         tf2_slsqp_solver_config_dict = OptionDict({
@@ -97,43 +140,48 @@ class MFASettings(object):
             ParamName.emu_gradient_hessian_parallel_num: emu_gradient_hessian_parallel_num,
             ParamName.emu_value_parallel_num: emu_value_parallel_num,
         })
-        tf2_slsqp_mfa_config = raw_slsqp_mfa_config.copy()
+        if copy:
+            tf2_slsqp_mfa_config = raw_slsqp_mfa_config.copy()
+        else:
+            tf2_slsqp_mfa_config = raw_slsqp_mfa_config
         tf2_slsqp_mfa_config.solver_type = ParamName.tf2_slsqp_solver
         tf2_slsqp_mfa_config.solver_config_dict = tf2_slsqp_solver_config_dict
         return tf2_slsqp_mfa_config
 
-    def specific_flux_range_constant_flux_dict_modifier(self, model_tissue_set, flux_name_index_dict,):
+    @staticmethod
+    def construct_flux_dict(user_defined_flux_dict, flux_name_index_dict, model_tissue_set):
         def add_new_component(_flux_dict, _flux_name, _flux_tissue, _flux_range):
             _new_flux_name = tissue_specific_name_constructor(_flux_name, tissue_name_list=_flux_tissue)
             if _new_flux_name in flux_name_index_dict:
                 _flux_dict[_new_flux_name] = _flux_range
 
-        def construct_flux_dict(user_defined_flux_dict):
-            target_flux_dict = {}
-            for flux_name, (flux_tissue, flux_range) in user_defined_flux_dict.items():
-                if flux_tissue is not None:
-                    if isinstance(flux_tissue, str):
-                        add_new_component(target_flux_dict, flux_name, flux_tissue, flux_range)
-                    elif isinstance(flux_tissue, (tuple, list)):
-                        for flux_tissue_item in flux_tissue:
-                            add_new_component(target_flux_dict, flux_name, flux_tissue_item, flux_range)
-                    else:
-                        raise ValueError('Type not recognized!')
+        target_flux_dict = {}
+        for flux_name, (flux_tissue, flux_range) in user_defined_flux_dict.items():
+            if flux_tissue is not None:
+                if isinstance(flux_tissue, str):
+                    add_new_component(target_flux_dict, flux_name, flux_tissue, flux_range)
+                elif isinstance(flux_tissue, (tuple, list)):
+                    for flux_tissue_item in flux_tissue:
+                        add_new_component(target_flux_dict, flux_name, flux_tissue_item, flux_range)
                 else:
-                    for model_tissue in model_tissue_set:
-                        add_new_component(target_flux_dict, flux_name, model_tissue, flux_range)
-            return target_flux_dict
+                    raise ValueError('Type not recognized!')
+            else:
+                for model_tissue in model_tissue_set:
+                    add_new_component(target_flux_dict, flux_name, model_tissue, flux_range)
+        return target_flux_dict
 
-        specific_flux_range_dict = construct_flux_dict(self.user_defined_specific_flux_range_dict)
-        constant_flux_dict = construct_flux_dict(self.user_defined_constant_flux_dict)
-        raw_mfa_config = self.default_slsqp_mfa_config
-        if isinstance(raw_mfa_config, dict):
-            for each_tissue_raw_mfa_config in raw_mfa_config.values():
-                each_tissue_raw_mfa_config.specific_flux_range_dict = dict(specific_flux_range_dict)
-                each_tissue_raw_mfa_config.preset_constant_flux_value_dict = dict(constant_flux_dict)
-        else:
-            raw_mfa_config.specific_flux_range_dict = specific_flux_range_dict
-            raw_mfa_config.preset_constant_flux_value_dict = constant_flux_dict
+    @staticmethod
+    def specific_flux_range_constant_flux_dict_modifier(
+            raw_mfa_config, user_defined_specific_flux_range_dict, user_defined_constant_flux_dict,
+            model_tissue_set, flux_name_index_dict, **other_parameters):
+        specific_flux_range_dict = MFASettings.construct_flux_dict(
+            user_defined_specific_flux_range_dict, model_tissue_set, flux_name_index_dict)
+        constant_flux_dict = MFASettings.construct_flux_dict(
+            user_defined_constant_flux_dict, model_tissue_set, flux_name_index_dict)
+        new_mfa_config = raw_mfa_config.copy()
+        new_mfa_config.specific_flux_range_dict = specific_flux_range_dict
+        new_mfa_config.preset_constant_flux_value_dict = constant_flux_dict
+        return new_mfa_config
 
     def _generate_solver_parameter_dict(
             self, each_case_target_optimization_num, test_mode=False, report_interval=None,
@@ -184,7 +232,7 @@ class MFASettings(object):
 
     def _construct_tf2_running_settings(
             self, suffix, test_mode, docker_mode, parallel_num):
-        raw_slsqp_mfa_config = self.default_slsqp_mfa_config
+        # raw_slsqp_mfa_config = self.default_slsqp_mfa_config
 
         mp.set_start_method('spawn')
         # if os.name == 'nt':
@@ -206,17 +254,26 @@ class MFASettings(object):
         initial_processes_num = self.initial_processes_num
         emu_gradient_hessian_parallel_num = 3
 
-        if self.result_label_obj_value_dict is not None:
-            slsqp_mfa_config = {
-                result_label: self.construct_tf2_slsqp_mfa_config(
-                    raw_slsqp_mfa_config, batch_size, each_portion_flux_num, nnls_parallel_num,
-                    emu_value_parallel_num,
-                    emu_gradient_hessian_parallel_num, target_obj_value)
-                for result_label, target_obj_value in self.result_label_obj_value_dict.items()}
-        else:
-            slsqp_mfa_config = self.construct_tf2_slsqp_mfa_config(
-                raw_slsqp_mfa_config, batch_size, each_portion_flux_num, nnls_parallel_num, emu_value_parallel_num,
-                emu_gradient_hessian_parallel_num)
+        self.common_tf2_batch_param_dict = {
+            self.batch_size_str: batch_size,
+            self.each_portion_flux_num_str: each_portion_flux_num,
+            self.nnls_parallel_num_str: nnls_parallel_num,
+            self.emu_value_parallel_num_str: emu_value_parallel_num,
+            self.emu_gradient_hessian_parallel_num_str: emu_gradient_hessian_parallel_num,
+        }
+
+        # if self.result_label_obj_value_dict is not None:
+        #     slsqp_mfa_config = {
+        #         result_label: self.construct_tf2_slsqp_mfa_config(
+        #             raw_slsqp_mfa_config, batch_size, each_portion_flux_num, nnls_parallel_num,
+        #             emu_value_parallel_num,
+        #             emu_gradient_hessian_parallel_num, target_obj_value)
+        #         for result_label, target_obj_value in self.result_label_obj_value_dict.items()}
+        # else:
+        #     slsqp_mfa_config = self.construct_tf2_slsqp_mfa_config(
+        #         raw_slsqp_mfa_config, batch_size, each_portion_flux_num, nnls_parallel_num, emu_value_parallel_num,
+        #         emu_gradient_hessian_parallel_num)
+
         parallel_parameter_dict = {
             ParallelSolverKeywords.max_optimization_each_generation: max_optimization_each_generation,
             ParallelSolverKeywords.batch_solving: batch_size,
@@ -230,7 +287,7 @@ class MFASettings(object):
         print(f'Current experiment: suffix: {suffix}, Batch size: {batch_size}, Hessian portion size: {each_portion_flux_num}, '
               f'EMU gradient/hessian parallel num: {emu_gradient_hessian_parallel_num}, '
               f'NNLS parallel num: {nnls_parallel_num}, EMU value parallel num: {emu_value_parallel_num}')
-        return slsqp_mfa_config, solver_parameter_dict
+        return solver_parameter_dict
 
     def ordinary_slsqp_running_parameter(self):
         each_process_optimization_num = 20
@@ -266,7 +323,7 @@ class MFASettings(object):
             }
             print(f'Current experiment: suffix: {suffix}, max initial value: {max_optimization_each_generation}, '
                   f'each process max num: {each_process_optimization_num}, parallel num: {parallel_num}')
-        slsqp_mfa_config = self.default_slsqp_mfa_config
+        # slsqp_mfa_config = self.default_slsqp_mfa_config
         result_parallel_num = 7
         self.update_final_process_parameter_dict(
             result_parallel_num=result_parallel_num, average_optimized_results=None,
@@ -276,18 +333,38 @@ class MFASettings(object):
             test_mode=test_mode, report_interval=report_interval,
             parallel_parameter_dict=parallel_parameter_dict,
             load_previous_results=self.load_previous_results, docker_mode=docker_mode)
-        return slsqp_mfa_config, solver_parameter_dict
+        return solver_parameter_dict
 
-    def construct_running_settings(
+    def construct_solver_parameter_dict(
             self, test_mode, docker_mode, suffix, parallel_num):
         if self.tf2_solver:
-            slsqp_mfa_config, solver_parameter_dict = self._construct_tf2_running_settings(
+            solver_parameter_dict = self._construct_tf2_running_settings(
                 suffix, test_mode, docker_mode, parallel_num)
         else:
-            slsqp_mfa_config, solver_parameter_dict = self._construct_ordinary_slsqp_running_settings(
+            solver_parameter_dict = self._construct_ordinary_slsqp_running_settings(
                 suffix, test_mode, docker_mode, parallel_num)
+        return solver_parameter_dict
 
-        return slsqp_mfa_config, solver_parameter_dict
+    def construct_mfa_config(self, config_parameter_dict):
+        raw_mfa_config = self.default_slsqp_mfa_config
+        new_mfa_config = self.specific_flux_range_constant_flux_dict_modifier(
+            raw_mfa_config=raw_mfa_config, **config_parameter_dict)
+        if self.tf2_solver:
+            common_tf2_batch_param_dict = self.common_tf2_batch_param_dict
+            new_mfa_config = self.construct_tf2_slsqp_mfa_config(
+                new_mfa_config, copy=False, **common_tf2_batch_param_dict, **config_parameter_dict)
+        return new_mfa_config
+
+    # def construct_running_settings(
+    #         self, test_mode, docker_mode, suffix, parallel_num):
+    #     if self.tf2_solver:
+    #         slsqp_mfa_config, solver_parameter_dict = self._construct_tf2_running_settings(
+    #             suffix, test_mode, docker_mode, parallel_num)
+    #     else:
+    #         slsqp_mfa_config, solver_parameter_dict = self._construct_ordinary_slsqp_running_settings(
+    #             suffix, test_mode, docker_mode, parallel_num)
+    #
+    #     return slsqp_mfa_config, solver_parameter_dict
 
 # benchmark parameter:
 

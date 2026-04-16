@@ -82,7 +82,7 @@ def group_emu_name_constructor(metabolite_name, case_name=None):
 
 
 def isdigit(number):
-    return isinstance(number, int) or isinstance(number, float)
+    return isinstance(number, int | float)
 
 
 def default_parameter_extract(option_dict, key, default_value):
@@ -171,11 +171,12 @@ def biomass_reaction_dict_constructor(biomass_metabolite_name_list):
 
 def exchange_reaction_constructor(
         metabolite_carbon_num_list, original_compartment, target_compartment,
-        reaction_specific_suffix=None, reversible=True):
+        reaction_specific_suffix=None, reversible=True, output_target_metabolite_name_carbon_num_list=False):
     underline_original_compartment = f'_{original_compartment}'
     underline_target_compartment = f'_{target_compartment}'
     exchange_reaction_dict_list = []
     new_metabolite_name_list = []
+    target_metabolite_name_carbon_num_list = []
     ord_a = ord('a')
     for (metabolite_name, carbon_num) in metabolite_carbon_num_list:
         assert metabolite_name.endswith(underline_original_compartment)
@@ -194,7 +195,12 @@ def exchange_reaction_constructor(
             new_reaction_dict['reverse'] = True
         exchange_reaction_dict_list.append(new_reaction_dict)
         new_metabolite_name_list.append(new_metabolite_name)
-    return exchange_reaction_dict_list, new_metabolite_name_list
+        if output_target_metabolite_name_carbon_num_list:
+            target_metabolite_name_carbon_num_list.append((new_metabolite_name, carbon_num))
+    if output_target_metabolite_name_carbon_num_list:
+        return (exchange_reaction_dict_list, new_metabolite_name_list, target_metabolite_name_carbon_num_list)
+    else:
+        return exchange_reaction_dict_list, new_metabolite_name_list
 
 
 def mid_name_process(raw_mid_name):

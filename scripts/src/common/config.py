@@ -14,14 +14,11 @@ class Keywords(object):
     optimized = 'optimized'
     unoptimized = 'unoptimized'
     experimental = 'experimental'
+    combine = 'combine'
 
     mid_prediction = 'mid_prediction'
     flux_comparison = 'flux_comparison'
-    glucose__ad__ctrl__1 = 'glucose__ad__ctrl__1'
-    glucose__ad__semaglutide__1 = 'glucose__ad__semaglutide__1'
-    glucose__ad__semaglutide__2 = 'glucose__ad__semaglutide__2'
-    glucose__ad__semaglutide__3 = 'glucose__ad__semaglutide__3'
-
+    tissue = 'tissue'
 
 
 class DataType(object):

@@ -238,4 +238,5 @@ class ModelKeyword(object):
     basal_ganglia = 'basal_ganglia'
     cerebellum = 'cerebellum'
     brainstem = 'brainstem'
+    cell = 'cell'
 

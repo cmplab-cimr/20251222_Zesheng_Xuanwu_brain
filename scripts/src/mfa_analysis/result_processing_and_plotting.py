@@ -4,11 +4,10 @@ from .config import (
     time_distribution_plotting, DataSource, FigureData, FigureDataKeywords,
     tissue_specific_name_constructor, np, reversible_flux_pair_dict_generator,
     tissue_specific_reversible_flux_title_constructor_generator, check_and_mkdir_of_direct, figure_plotting,
-    Direct, experimental_data_plotting_func_template, TransformDict, output_raw_flux_data, output_predicted_mid_data,
+    Direct, experimental_data_plotting_func_template, output_raw_experimental_mid_data,
+    TransformDict, output_raw_flux_data, output_predicted_mid_data, output_flux_comparison_data,
     experimental_mid_prediction_plotting_func_template, flux_comparison_plotting_func_template,
 )
-from .common_functions import (
-    tissue_specific_metabolite_mid_list_constructor, tissue_specific_flux_list_constructor)
 
 
 class FinalResult(GeneralFinalResult):
@@ -150,7 +149,9 @@ def result_final_process(
         final_information_dict, final_result_obj.flux_name_tissue_name_dict,
         result_process_information_dict_analysis,
         flux_comparison_output_direct=final_result_obj.flux_comparison_output_direct,
-        subset_index_dict=subset_index_dict, **other_param_dict)
+        subset_index_dict=subset_index_dict,
+        flux_comparison_xlsx_file_path=final_result_obj.flux_comparison_submitted_output_xlsx_path,
+        **other_param_dict)
 
     metabolic_network_plotting(
         final_solution_data_dict, final_flux_name_index_dict, final_result_obj.metabolic_network_visualization_direct,
@@ -195,12 +196,13 @@ def multi_tissue_experimental_mid_prediction(
 def flux_comparison_parameter_generator(
         experiment_name, solution_array_dict, final_flux_name_index_dict, final_information_dict, flux_name_tissue_name_dict,
         result_process_information_dict_analysis, flux_comparison_output_direct, tissue_flux_name_list_dict_constructor,
-        subset_index_dict=None, flux_comparison_figure_config_dict=None, **kwargs):
+        subset_index_dict=None, flux_comparison_figure_config_dict=None, flux_comparison_xlsx_file_path=None,
+        **kwargs):
     if flux_comparison_figure_config_dict is None:
         flux_comparison_figure_config_dict = {}
 
     # Create and call the template function
-    flux_comparison_plotting_func_template(
+    organized_mouse_data_dict = flux_comparison_plotting_func_template(
         tissue_flux_name_list_dict_constructor,
         flux_name_tissue_name_dict,
         result_process_information_dict_analysis,
@@ -210,6 +212,11 @@ def flux_comparison_parameter_generator(
     )(
         experiment_name, solution_array_dict, final_flux_name_index_dict, final_information_dict,
         flux_comparison_output_direct, subset_index_dict=subset_index_dict)
+
+    if flux_comparison_xlsx_file_path is not None:
+        output_flux_comparison_data(
+            flux_comparison_xlsx_file_path, organized_mouse_data_dict,
+            other_label_column_dict=None)
 
 
 def metabolic_network_plotting(
@@ -242,15 +249,21 @@ def metabolic_network_plotting(
 
 
 def experimental_mid_and_raw_data_plotting(
-        mouse_id_mfa_data_dict, result_information_dict, final_result_obj, result_information_dict_analysis=None,
-        tissue_mid_name_list_dict_constructor=None, experimental_figure_config_dict=None, average_data=False):
+        experimental_mfa_data_obj_dict, result_information_dict, final_result_obj, result_information_dict_analysis=None,
+        tissue_mid_name_list_dict_constructor=None, experimental_figure_config_dict=None):
     if experimental_figure_config_dict is None:
         experimental_figure_config_dict = {}
     experimental_data_output_direct = final_result_obj.experimental_data_output_direct
 
     experimental_data_plotting_func_template(
-        mouse_id_mfa_data_dict, tissue_mid_name_list_dict_constructor, result_information_dict_analysis,
+        tissue_mid_name_list_dict_constructor, result_information_dict_analysis,
         major_key_file_name_func=lambda major_key: f'target_metabolites_{major_key}_labeling',
         **experimental_figure_config_dict)(
-            mouse_id_mfa_data_dict, result_information_dict, experimental_data_output_direct,
+            experimental_mfa_data_obj_dict, result_information_dict, experimental_data_output_direct,
             complete_mid_std_data_vector_dict=None)
+
+    raw_experimental_mid_data_submitted_output_xlsx_path = final_result_obj.raw_experimental_mid_data_submitted_output_xlsx_path
+    output_raw_experimental_mid_data(
+        raw_experimental_mid_data_submitted_output_xlsx_path, experimental_mfa_data_obj_dict, result_information_dict,
+        other_label_row_dict=None)
+

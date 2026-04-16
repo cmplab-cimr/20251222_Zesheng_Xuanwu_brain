@@ -1,9 +1,9 @@
 from scripts.src.common.config import Color, Keywords, Direct
 from scripts.src.common.functions import data_param_list_generator_func_template, \
     collect_results_func_template
-from scripts.src.common.packages import it
-from scripts.src.io_functions.result_processing_functions import common_flux_comparison_func, \
-    experimental_data_plotting_func_template, mid_name_list_generator_for_multiple_labeling_substrate
+from scripts.src.common.packages import it, np
+from scripts.src.io_functions.result_processing_functions import \
+    mid_name_list_generator_for_multiple_labeling_substrate
 
 from scripts.data.data_loader import DataSource, common_data_loader
 
@@ -17,14 +17,14 @@ from ..inventory import MFARunningMode
 
 from scripts.src.mfa_analysis.mfa_config_generator import MFASettings
 
-average_str = 'average'
-
 data_name = DataSource.data_20251115_ad_sema
 model_name = ModelList.liver_cortex_compartmentalized_model
-data_content, keyword = common_data_loader(data_name, test_mode=False, natural_anti_correction=False)
+_, keyword = common_data_loader(
+    data_name, keyword_only=True, test_mode=False, natural_anti_correction=False)
 user_defined_model = model_loader(model_name)
 mfa_model_obj = common_model_constructor(user_defined_model)
 def return_data_content(running_mode, dataset_id=None, **kwargs):
+    data_content, _ = common_data_loader(data_name, test_mode=False, natural_anti_correction=False)
     if running_mode == MFARunningMode.raw_experimental_data_plotting:
         return data_content
     else:
@@ -115,18 +115,54 @@ def result_process_information_dict_analysis(complete_result_information_dict, t
             return_parameter_list.append(
                 (result_label, major_key, minor_key_list, minor_key_str, current_color, order_index))
     elif target == Keywords.flux_comparison:
+        flux_comparison_color_order_dict = {
+            'ctrl_semaglutide_combined': {
+                (keyword.ctrl, tuple(range(1, 7))): (0, ColorConfig.normal_blue),
+                (keyword.sema, tuple(range(1, 7))): (1, ColorConfig.orange),
+            },
+            'ctrl_semaglutide_individual': color_order_dict
+        }
+        complete_result_label_information_dict_dict = {}
         for result_label, current_result_information_dict in complete_result_information_dict.items():
-            major_key = data_name
             condition = current_result_information_dict[keyword.condition]
             index = current_result_information_dict[keyword.index]
-            minor_key_list = []
-            minor_key_str = f'{condition}_{index}'
-            order_index, current_color = color_order_dict[(condition, index)]
-            return_parameter_list.append(
-                (result_label, major_key, minor_key_list, minor_key_str, current_color, order_index))
+            identity_tuple = (condition, index)
+            complete_result_label_information_dict_dict[identity_tuple] = result_label
+
+        for major_key, each_major_key_dict in flux_comparison_color_order_dict.items():
+            for complete_tuple, (order_index, current_color) in each_major_key_dict.items():
+                (condition, index) = complete_tuple
+                if isinstance(index, (tuple, list)):
+                    minor_key_str = f'{condition}_{Keywords.combine}'
+                    result_label_list = tuple([
+                        complete_result_label_information_dict_dict[(condition, current_index)]
+                        for current_index in index])
+                    result_label = result_label_list
+                    minor_key_list = []
+                elif isinstance(index, int):
+                    minor_key_list = []
+                    minor_key_str = f'{condition}_{index}'
+                    result_label = complete_result_label_information_dict_dict[complete_tuple]
+                else:
+                    raise ValueError()
+                return_parameter_list.append(
+                    (result_label, major_key, minor_key_list, minor_key_str, current_color, order_index))
     else:
         raise ValueError()
     return return_parameter_list
+
+
+def flux_process_map_func(each_flux_data_array, major_key, minor_key_str):
+    if major_key == 'ctrl_semaglutide_combined':
+        total_num = len(each_flux_data_array)
+        half_num = total_num // 2
+        sorted_indices = np.argsort(each_flux_data_array)
+        center_start = (total_num - half_num) // 2
+        selected_indices = sorted_indices[center_start:center_start + half_num]
+        processed_flux_data_array = each_flux_data_array[selected_indices]
+    else:
+        processed_flux_data_array = each_flux_data_array
+    return processed_flux_data_array
 
 
 def result_process_figure_config_dict_generator():
@@ -204,7 +240,9 @@ def tissue_flux_name_list_dict_constructor(current_model_name=model_name, **kwar
     }
     specific_tissue_reversible_flux_pair_dict = {
     }
-    return all_tissue_flux_name_list_dict, display_flux_name_dict, specific_tissue_reversible_flux_pair_dict
+    return (
+        all_tissue_flux_name_list_dict, display_flux_name_dict, keyword.display_tissue_name_dict,
+        specific_tissue_reversible_flux_pair_dict, flux_process_map_func)
 
 
 def metabolic_network_parameter_generator():
