@@ -220,13 +220,14 @@ class MFASettings(object):
         batch_size_96g = 240
         nnls_parallel_num_32g_64g = 30
         nnls_parallel_num_96g = 40
+        emu_gh_parallel_num_default = 3
         test_batch_size = 39
         parameter_tuple_for_each_suffix_dict = {
-            'test': (test_batch_size, 2000, test_batch_size, test_batch_size),
-            None: (batch_size_32g, 4000, nnls_parallel_num_32g_64g, nnls_parallel_num_32g_64g),
-            '0': (batch_size_32g, 4000, nnls_parallel_num_32g_64g, nnls_parallel_num_32g_64g),
-            '1': (batch_size_64g, 4000, nnls_parallel_num_32g_64g, nnls_parallel_num_32g_64g),
-            '2': (batch_size_96g, 4000, nnls_parallel_num_96g, nnls_parallel_num_96g),
+            'test': (test_batch_size, 2000, test_batch_size, test_batch_size, emu_gh_parallel_num_default),
+            None: (batch_size_32g, 4000, nnls_parallel_num_32g_64g, nnls_parallel_num_32g_64g, emu_gh_parallel_num_default),
+            '0': (batch_size_32g, 4000, nnls_parallel_num_32g_64g, nnls_parallel_num_32g_64g, emu_gh_parallel_num_default),
+            '1': (batch_size_64g, 4000, nnls_parallel_num_32g_64g, nnls_parallel_num_32g_64g, emu_gh_parallel_num_default),
+            '2': (batch_size_96g, 4000, nnls_parallel_num_96g, nnls_parallel_num_96g, emu_gh_parallel_num_default),
         }
         return batch_size_32g, parameter_tuple_for_each_suffix_dict
 
@@ -242,17 +243,18 @@ class MFASettings(object):
         result_parallel_num, parameter_tuple_for_each_suffix_dict = self.tf2_running_parameters()
         if test_mode:
             (
-                batch_size, each_portion_flux_num, nnls_parallel_num, emu_value_parallel_num
+                batch_size, each_portion_flux_num, nnls_parallel_num, emu_value_parallel_num,
+                emu_gradient_hessian_parallel_num
             ) = parameter_tuple_for_each_suffix_dict['test']
             each_case_target_optimization_num = 2 * batch_size
         else:
             (
-                batch_size, each_portion_flux_num, nnls_parallel_num, emu_value_parallel_num
+                batch_size, each_portion_flux_num, nnls_parallel_num, emu_value_parallel_num,
+                emu_gradient_hessian_parallel_num
             ) = parameter_tuple_for_each_suffix_dict[suffix]
             each_case_target_optimization_num = self.optimization_num_for_each_suffix_dict[suffix]
         max_optimization_each_generation = self.initial_batch_multiple * batch_size
         initial_processes_num = self.initial_processes_num
-        emu_gradient_hessian_parallel_num = 3
 
         self.common_tf2_batch_param_dict = {
             self.batch_size_str: batch_size,

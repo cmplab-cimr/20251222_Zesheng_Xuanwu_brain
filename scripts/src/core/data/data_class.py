@@ -1,4 +1,4 @@
-from ..common.packages import np, optimize
+from ..common.packages import np, optimize, scipy_comb
 from ..common.classes import default_transform_dict, DefaultDict
 from ..common.config import CoreConstants
 from ..common.functions import (
@@ -111,6 +111,10 @@ class Atom(object):
     hydrogen = 'h'
     phosphorus = 'p'
 
+    m_plus_h = 'm+h'
+    m_minus_h = 'm-h'
+    proton_mass = 1.007_276
+
     natural_c13_ratio = CoreConstants.natural_c13_ratio
     natural_o17_ratio = 0.00038
     natural_o18_ratio = 0.002
@@ -169,6 +173,11 @@ class Atom(object):
     }
     computed_chemical_str_formula_dict = {}
     computed_chemical_formula_mid_dict = {}
+
+    isotope_num_precise_mass_list_dict = {
+        atom_name: []
+        for atom_name in isotope_mass_dict.keys()
+    }
 
     @classmethod
     def chemical_formula_dict_generator(cls, chemical_formula_str):
@@ -265,6 +274,147 @@ class Atom(object):
             final_mid_array = np_list_conv(final_mid_conv_list)
             cls.computed_chemical_formula_mid_dict[chemical_formula_str] = final_mid_array
         return final_mid_array
+
+    @staticmethod
+    def calculate_multinomial_probability(total_atom_num, counter_array, atom_abundance_array):
+        if len(atom_abundance_array) == 1:
+            prob = 1.0
+        elif len(atom_abundance_array) == 2:
+            prob = scipy_comb(total_atom_num, counter_array[1]) * np.prod(atom_abundance_array ** counter_array)
+        else:
+            inverse_exp_array = (atom_abundance_array ** counter_array)[::-1]
+            comb_upper_list = []
+            rest_atom = total_atom_num
+            for current_atom in counter_array:
+                comb_upper_list.append(rest_atom)
+                rest_atom -= current_atom
+            comb_upper_array = np.array(comb_upper_list)
+            comb_array = scipy_comb(comb_upper_array, counter_array)
+            prob = np.prod(comb_array * inverse_exp_array)
+        return prob
+
+    @classmethod
+    def precise_mass_calculater(
+            cls, chemical_formula_dict, adduct, mainly_traced_atom_tuple=('c',), max_len=None,
+            probability_threshold=-1):
+        def calculate_element_total_mass_value_abundance_list(
+                current_atom_num, atom_mass_vector, atom_abundance_vector,
+                current_element_isotope_precise_list, max_len):
+            isotope_num = len(atom_mass_vector)
+            if len(current_element_isotope_precise_list) > current_atom_num:
+                current_list = current_element_isotope_precise_list[current_atom_num]
+            else:
+                current_list = current_element_isotope_precise_list[-1]
+                while len(current_element_isotope_precise_list) <= current_atom_num:
+                    last_max_atom_total_list = current_list
+                    max_atom_num = len(current_element_isotope_precise_list)
+                    max_offset = min(max_atom_num * (isotope_num - 1) + 1, max_len)
+                    current_list = [{} for _ in range(max_offset)]
+                    for atom_index, (atom_mass, atom_abundance) in enumerate(
+                            zip(atom_abundance_vector, atom_mass_vector)):
+                        for last_offset_index, last_each_offset_dict in enumerate(last_max_atom_total_list):
+                            new_index = atom_index + last_offset_index
+                            if new_index >= max_len:
+                                continue
+                            current_dict = current_list[new_index]
+                            for last_counter_array, (last_total_mass, last_total_abundance) in last_each_offset_dict.items():
+                                new_counter_array = np.array(last_counter_array)
+                                new_counter_array[atom_index] += 1
+                                new_counter_tuple = tuple(new_counter_array)
+                                if new_counter_tuple not in current_dict:
+                                    new_total_mass = np.sum(new_counter_array * atom_mass_vector)
+                                    new_total_abundance = cls.calculate_multinomial_probability(
+                                        max_atom_num, new_counter_array, atom_abundance_vector)
+                                    current_dict[new_counter_tuple] = [new_total_mass, new_total_abundance]
+                    current_element_isotope_precise_list.append(current_list)
+            return current_list
+
+        def compute_one_element_mass(
+                element_isotope_precise_list, atom_mass_vector, atom_abundance_vector, repeat_num, max_len):
+            if len(element_isotope_precise_list) == 0:
+                one_list = []
+                for atom_index, (atom_mass, atom_abundance) in enumerate(
+                        zip(atom_mass_vector, atom_abundance_vector)):
+                    current_one_hot_array = np.zeros_like(atom_mass_vector, dtype=int)
+                    current_one_hot_array[atom_index] = 1
+                    one_list.append({tuple(current_one_hot_array): (atom_mass, atom_abundance)})
+                element_isotope_precise_list.extend([[], one_list])
+            else:
+                assert len(element_isotope_precise_list) >= 2
+            final_mass_abundance_list = calculate_element_total_mass_value_abundance_list(
+                repeat_num, atom_mass_vector, atom_abundance_vector,
+                element_isotope_precise_list, max_len)
+            return final_mass_abundance_list
+
+        def calculate_rest_element_mass(
+                result_element_list, molecule_max_len, total_mass_num_offset, total_mass_value, total_probability,
+                total_untraced_probability,
+                all_atom_category_combination_tuple, final_mass_list, atom_name_mass_abundance_vector_dict,
+                molecule_mass_offset, total_probability_threshold=-1):
+            if total_mass_num_offset > molecule_max_len or total_untraced_probability < total_probability_threshold:
+                return
+            elif len(result_element_list) == 0:
+                while len(final_mass_list) <= total_mass_num_offset:
+                    final_mass_list.append([])
+                real_mass = total_mass_value + molecule_mass_offset
+                final_mass_list[total_mass_num_offset].append(
+                    (real_mass, (total_probability, total_untraced_probability), all_atom_category_combination_tuple))
+            else:
+                current_element = result_element_list[0]
+                current_element_mass_list = atom_name_mass_abundance_vector_dict[current_element]
+                rest_result_atom_list = result_element_list[1:]
+                for mass_num_offset, atom_mass_dict in enumerate(current_element_mass_list):
+                    new_mass_offset = total_mass_num_offset + mass_num_offset
+                    for atom_category_counter_tuple, (each_element_mass, each_element_abundance) in atom_mass_dict.items():
+                        if current_element in traced_atom_num_dict:
+                            new_untraced_probability = total_untraced_probability
+                        else:
+                            new_untraced_probability = each_element_abundance * total_untraced_probability
+                        new_probability = each_element_abundance * total_probability
+                        new_mass_value = total_mass_value + each_element_mass
+                        new_all_atom_category_combination_tuple = (
+                            *all_atom_category_combination_tuple, (current_element, atom_category_counter_tuple))
+                        calculate_rest_element_mass(
+                            rest_result_atom_list, molecule_max_len, new_mass_offset, new_mass_value, new_probability,
+                            new_untraced_probability, new_all_atom_category_combination_tuple, final_mass_list,
+                            atom_name_mass_abundance_vector_dict, molecule_mass_offset, total_probability_threshold)
+
+        if adduct == cls.m_plus_h:
+            molecule_mass_offset = cls.proton_mass
+        elif adduct == cls.m_minus_h:
+            molecule_mass_offset = -cls.proton_mass
+        else:
+            raise ValueError()
+        traced_atom_num_dict = {
+            atom: chemical_formula_dict[atom] for atom in mainly_traced_atom_tuple}
+        untraced_atom_num_dict = {
+            atom_name: atom_num for atom_name, atom_num in chemical_formula_dict.items()
+            if atom_name not in mainly_traced_atom_tuple}
+        if max_len is None:
+            traced_atom_offset_list = []
+            for atom_label, atom_num in traced_atom_num_dict.items():
+                current_isotope_dim = len(cls.isotope_abundance_dict[atom_label]) - 1
+                traced_atom_offset_list.append(current_isotope_dim * atom_num)
+            max_len = sum(traced_atom_offset_list) + 1 + 3
+        all_atom_name_mass_abundance_vector_dict = {}
+        for atom_label, atom_num in chemical_formula_dict.items():
+            mass_vector = cls.isotope_mass_dict[atom_label]
+            abundance_vector = cls.isotope_abundance_dict[atom_label]
+            element_isotope_precise_list = cls.isotope_num_precise_mass_list_dict[atom_label]
+            all_atom_name_mass_abundance_vector_dict[atom_label] = compute_one_element_mass(
+                element_isotope_precise_list, mass_vector, abundance_vector, atom_num, max_len)
+            # all_atom_name_mass_abundance_vector_dict[atom_label] = compute_one_atom_mass(
+            #     mass_vector, abundance_vector, atom_num, max_len)
+        raw_all_possible_mass_list = []
+        initial_atom_list = list(chemical_formula_dict.keys())
+        calculate_rest_element_mass(
+            initial_atom_list, max_len, 0, 0, 1, 1,
+            tuple(), raw_all_possible_mass_list, all_atom_name_mass_abundance_vector_dict,
+            molecule_mass_offset, total_probability_threshold=probability_threshold)
+        all_possible_mass_atom_category_list = [
+            sorted(each_mass_offset_mass_list, key=lambda x: x[0])
+            for each_mass_offset_mass_list in raw_all_possible_mass_list]
+        return all_possible_mass_atom_category_list
 
 
 complete_metabolite_dim_dict = {

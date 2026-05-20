@@ -170,7 +170,7 @@ def multiple_tissue_model_analysis_main(
         experiment_name, running_mode, test_mode, docker_mode, dataset_id, suffix, parallel_num)
 
     final_result_obj = result_class(
-        Direct.output_direct, Direct.common_data_direct, experiment_name, suffix=suffix)
+        Direct.output_direct, Direct.common_data_direct, experiment_name, suffix=None)
 
     if running_mode == MFARunningMode.flux_analysis:
         exit_code = common_solver(

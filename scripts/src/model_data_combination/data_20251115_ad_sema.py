@@ -115,10 +115,11 @@ def result_process_information_dict_analysis(complete_result_information_dict, t
             return_parameter_list.append(
                 (result_label, major_key, minor_key_list, minor_key_str, current_color, order_index))
     elif target == Keywords.flux_comparison:
+        index_range = tuple(range(1, each_group_replicate_num + 1))
         flux_comparison_color_order_dict = {
             'ctrl_semaglutide_combined': {
-                (keyword.ctrl, tuple(range(1, 7))): (0, ColorConfig.normal_blue),
-                (keyword.sema, tuple(range(1, 7))): (1, ColorConfig.orange),
+                (keyword.ctrl, index_range): (0, ColorConfig.normal_blue),
+                (keyword.sema, index_range): (1, ColorConfig.orange),
             },
             'ctrl_semaglutide_individual': color_order_dict
         }

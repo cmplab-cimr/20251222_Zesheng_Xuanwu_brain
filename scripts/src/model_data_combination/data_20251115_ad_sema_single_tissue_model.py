@@ -41,9 +41,9 @@ def return_result_label_model_data_config_dict(
     model_tissue_list = [
         ModelKeyword.liver,
         # ModelKeyword.kidney,
-        # ModelKeyword.cortex,
+        ModelKeyword.cortex,
         ModelKeyword.hippocampus,
-        # ModelKeyword.hypothalamus,
+        ModelKeyword.hypothalamus,
         # ModelKeyword.q_muscle,
         # ModelKeyword.soleus_muscle,
         # ModelKeyword.brown_adipose,

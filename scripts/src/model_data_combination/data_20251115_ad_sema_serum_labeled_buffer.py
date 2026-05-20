@@ -32,6 +32,8 @@ def return_data_content(running_mode, dataset_id=None, **kwargs):
                 'glucose__ad__ctrl__4',
                 'glucose__ad__ctrl__5',
                 'glucose__ad__ctrl__6',
+            ],
+            'part3': [
                 'glucose__ad__semaglutide__4',
                 'glucose__ad__semaglutide__5',
                 'glucose__ad__semaglutide__6',
@@ -66,7 +68,7 @@ def return_data_content(running_mode, dataset_id=None, **kwargs):
 
 class UserDefinedMFASettings(OldUserDefinedMFASettings):
     optimization_num_for_each_suffix_dict = {
-        None: 2000,
+        None: 10000,
     }
     average_optimized_results = None
 
