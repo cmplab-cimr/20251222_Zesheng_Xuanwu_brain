@@ -7,8 +7,9 @@ from ..figure_plotting_package.common.common_figure_materials import CommonEleme
 from ..figure_plotting_package.common.figure_data_format import BasicFigureData as RawBasicFigureData
 from ..figure_plotting_package.common.classes import Vector, VerticalAlignment, HorizontalAlignment, FontWeight, \
     LineStyle, FontStyle
-from ..figure_plotting_package.common.common_functions import default_parameter_extract
-from ..figure_plotting_package.common.color import ColorConfig
+from ..figure_plotting_package.common.common_functions import (
+    default_parameter_extract, calculate_center_bottom_offset)
+from ..figure_plotting_package.common.color import ColorConfig, Color
 
 from ..figure_plotting_package.data_figure.config import (
     merge_axis_format_dict, ParameterName as DataParameterName, DataFigureConfig, Keywords,
@@ -19,7 +20,7 @@ CompositeFigure = GeneralElements.CompositeFigure
 TextBox = GeneralElements.TextBox
 
 class Direct(object):
-    figure_output_direct = 'figures/output_figure'
+    figure_output_direct = 'scripts/figures/output_figure'
 
 
 class Figure(GeneralElements.Figure):

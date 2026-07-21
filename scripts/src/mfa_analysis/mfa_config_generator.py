@@ -6,6 +6,8 @@ from ..common_parallel_solver.config import Keywords as ParallelSolverKeywords
 
 from ..inventory import MFARunningMode
 
+import warnings
+
 
 class ModelDataSpecificSettings(object):
     def __init__(
@@ -148,26 +150,109 @@ class MFASettings(object):
         tf2_slsqp_mfa_config.solver_config_dict = tf2_slsqp_solver_config_dict
         return tf2_slsqp_mfa_config
 
+    @classmethod
+    def combine_flux_dict(cls, parent_user_defined_flux_dict, new_user_defined_flux_dict):
+        def convert_flux_content_to_dict(_flux_content):
+            if isinstance(_flux_content, (tuple, list)) and len(_flux_content) == 2:
+                (_flux_tissue, _flux_range) = _flux_content
+                if _flux_tissue is None:
+                    raise ValueError('Cannot convert undefined flux tissue')
+                elif isinstance(_flux_tissue, (tuple, list)):
+                    _output_dict = {}
+                    for flux_tissue_item in _flux_tissue:
+                        _output_dict[flux_tissue_item] = _flux_range
+                elif isinstance(_flux_tissue, str):
+                    _output_dict = {_flux_tissue: _flux_range}
+                else:
+                    raise ValueError(error_str)
+            elif isinstance(_flux_content, dict):
+                _output_dict = _flux_content
+            else:
+                raise ValueError(error_str)
+            return _output_dict
+
+        error_str = 'Type not recognized!'
+        combined_new_flux_dict = dict(parent_user_defined_flux_dict)
+        for new_flux_name, new_flux_content in new_user_defined_flux_dict.items():
+            if new_flux_name in combined_new_flux_dict:
+                old_flux_content = combined_new_flux_dict[new_flux_name]
+                finished = False
+                updated_flux_content = None
+                if isinstance(old_flux_content, (tuple, list)) and isinstance(new_flux_content, (tuple, list)):
+                    if old_flux_content[0] == new_flux_content[0]:
+                        updated_flux_content = new_flux_content
+                        finished = True
+                if not finished:
+                    old_flux_dict = convert_flux_content_to_dict(old_flux_content)
+                    new_flux_dict = convert_flux_content_to_dict(new_flux_content)
+                    updated_flux_content_dict = {
+                        **old_flux_dict,
+                        **new_flux_dict,
+                    }
+                    updated_flux_content = updated_flux_content_dict
+                combined_new_flux_dict[new_flux_name] = updated_flux_content
+            else:
+                combined_new_flux_dict[new_flux_name] = new_flux_content
+        return combined_new_flux_dict
+
+    @classmethod
+    def combine_flux_dict_list(cls, original_user_defined_flux_dict, new_user_defined_flux_dict_list):
+        combined_new_flux_dict = original_user_defined_flux_dict
+        for new_flux_dict in new_user_defined_flux_dict_list:
+            combined_new_flux_dict = cls.combine_flux_dict(combined_new_flux_dict, new_flux_dict)
+        return combined_new_flux_dict
+
     @staticmethod
-    def construct_flux_dict(user_defined_flux_dict, flux_name_index_dict, model_tissue_set):
+    def construct_flux_dict(user_defined_flux_dict, model_tissue_set, flux_name_index_dict):
+        """
+        :param user_defined_flux_dict:
+            {
+                'flux_name_1': (None, (1, 10)),
+                'flux_name_2': ('serum', (2, 5)),
+                'flux_name_3': (('serum', 'kidney'), (5, 10)),
+                'flux_name_4': (
+                    ('serum', (2, 5)),
+                    ('liver', (3, 4)),
+                ),
+            }
+        :param model_tissue_set:
+        :param flux_name_index_dict:
+        :return:
+        """
         def add_new_component(_flux_dict, _flux_name, _flux_tissue, _flux_range):
             _new_flux_name = tissue_specific_name_constructor(_flux_name, tissue_name_list=_flux_tissue)
             if _new_flux_name in flux_name_index_dict:
                 _flux_dict[_new_flux_name] = _flux_range
-
-        target_flux_dict = {}
-        for flux_name, (flux_tissue, flux_range) in user_defined_flux_dict.items():
-            if flux_tissue is not None:
-                if isinstance(flux_tissue, str):
-                    add_new_component(target_flux_dict, flux_name, flux_tissue, flux_range)
-                elif isinstance(flux_tissue, (tuple, list)):
-                    for flux_tissue_item in flux_tissue:
-                        add_new_component(target_flux_dict, flux_name, flux_tissue_item, flux_range)
-                else:
-                    raise ValueError('Type not recognized!')
             else:
-                for model_tissue in model_tissue_set:
-                    add_new_component(target_flux_dict, flux_name, model_tissue, flux_range)
+                warnings.warn("Flux name '{}' not found in flux_name_index_dict".format(_new_flux_name))
+
+        def decipher_single_flux_range(
+                _flux_name, _target_flux_dict, _flux_tissue, _flux_range, _model_tissue_set):
+            if _flux_tissue is None:
+                for model_tissue in _model_tissue_set:
+                    add_new_component(_target_flux_dict, _flux_name, model_tissue, _flux_range)
+            elif isinstance(_flux_tissue, str):
+                add_new_component(_target_flux_dict, _flux_name, _flux_tissue, _flux_range)
+            elif isinstance(_flux_tissue, (tuple, list)):
+                for flux_tissue_item in _flux_tissue:
+                    add_new_component(_target_flux_dict, _flux_name, flux_tissue_item, _flux_range)
+            else:
+                raise ValueError(error_info)
+
+        def decipher_tissue_range(_flux_name, _tissue_range_tuple_dict, _target_flux_dict, _model_tissue_set):
+            if isinstance(_tissue_range_tuple_dict, dict):
+                for flux_tissue, flux_range in _tissue_range_tuple_dict.items():
+                    decipher_single_flux_range(_flux_name, _target_flux_dict, flux_tissue, flux_range, _model_tissue_set)
+            elif isinstance(_tissue_range_tuple_dict, (tuple, list)) and len(_tissue_range_tuple_dict) == 2:
+                (flux_tissue, flux_range) = _tissue_range_tuple_dict
+                decipher_single_flux_range(_flux_name, _target_flux_dict, flux_tissue, flux_range, _model_tissue_set)
+            else:
+                raise ValueError(error_info)
+
+        error_info = 'Type not recognized!'
+        target_flux_dict = {}
+        for flux_name, tissue_range_tuple_dict in user_defined_flux_dict.items():
+            decipher_tissue_range(flux_name, tissue_range_tuple_dict, target_flux_dict, model_tissue_set)
         return target_flux_dict
 
     @staticmethod

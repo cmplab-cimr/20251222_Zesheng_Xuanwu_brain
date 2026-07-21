@@ -171,7 +171,7 @@ def biomass_reaction_dict_constructor(biomass_metabolite_name_list):
 
 def exchange_reaction_constructor(
         metabolite_carbon_num_list, original_compartment, target_compartment,
-        reaction_specific_suffix=None, reversible=True, output_target_metabolite_name_carbon_num_list=False):
+        reaction_specific_prefix='EXCHANGE', reaction_specific_suffix=None, reversible=True, output_target_metabolite_name_carbon_num_list=False):
     underline_original_compartment = f'_{original_compartment}'
     underline_target_compartment = f'_{target_compartment}'
     exchange_reaction_dict_list = []
@@ -181,9 +181,11 @@ def exchange_reaction_constructor(
     for (metabolite_name, carbon_num) in metabolite_carbon_num_list:
         assert metabolite_name.endswith(underline_original_compartment)
         bare_metabolite_name = metabolite_name[:-len(underline_original_compartment)]
-        reaction_id = f'EXCHANGE_{bare_metabolite_name}_{original_compartment}_{target_compartment}'
-        if reaction_specific_suffix is not None:
-            reaction_id = f'{reaction_id}_{reaction_specific_suffix}'
+        reaction_id = '_'.join(filter(None, [
+            reaction_specific_prefix,
+            f'{bare_metabolite_name}_{original_compartment}_{target_compartment}',
+            reaction_specific_suffix,
+        ]))
         carbon_mapping_str = ''.join([chr(ord_a + i) for i in range(carbon_num)])
         new_metabolite_name = f'{bare_metabolite_name}{underline_target_compartment}'
         new_reaction_dict = {
@@ -226,29 +228,32 @@ def tissue_name_breakdown(raw_name):
     if tissue_sep not in raw_name:
         return None, raw_name
     plus = '+'
-    prefix = None
+    underline = '_'
     search_start = 0
-    main_body_list = []
+    prefix_dict = {}
+    main_body_dict = {}
     while True:
         sep_location = raw_name.find(tissue_sep, search_start)
         if sep_location == -1:
             break
         else:
             this_prefix = raw_name[search_start:sep_location]
-            if prefix is None:
-                prefix = this_prefix
-            else:
-                assert this_prefix == prefix
+            if this_prefix not in prefix_dict:
+                prefix_dict[this_prefix] = None
             body_start = sep_location + len(tissue_sep)
             next_plus_location = raw_name.find(plus, sep_location)
             if next_plus_location == -1:
-                main_body_list.append(raw_name[body_start:])
+                next_body_name = raw_name[body_start:]
+                if next_body_name not in main_body_dict:
+                    main_body_dict[next_body_name] = None
                 break
             else:
-                next_search_start = next_plus_location + 1
-                main_body_list.append(raw_name[body_start:next_search_start])
-                search_start = next_search_start
-    main_body = ''.join(main_body_list)
+                next_body_name = raw_name[body_start:next_plus_location]
+                if next_body_name not in main_body_dict:
+                    main_body_dict[next_body_name] = None
+                search_start = next_plus_location + 1
+    main_body = plus.join(main_body_dict.keys())
+    prefix = underline.join(prefix_dict.keys())
     return prefix, main_body
 
 

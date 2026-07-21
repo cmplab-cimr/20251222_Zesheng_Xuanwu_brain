@@ -244,5 +244,8 @@ class ModelKeyword(object):
     basal_ganglia = 'basal_ganglia'
     cerebellum = 'cerebellum'
     brainstem = 'brainstem'
+    neuron = 'neuron'
+    astrocyte = 'astrocyte'
     cell = 'cell'
+    isf = 'isf' # interstitial_fluid
 

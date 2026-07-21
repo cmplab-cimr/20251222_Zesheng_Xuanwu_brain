@@ -92,7 +92,9 @@ def cbar_plotting(
     if cbar_orientation == ParameterName.horizontal:
         ticks = x_ticks
     elif cbar_orientation == ParameterName.vertical:
-        ticks = y_ticks
+        ticks = right_y_ticks
+        set_ax_tick_parameter(
+            current_ax, parameter_dict=None, top=False, bottom=False, left=False, right=True)
     else:
         raise ValueError()
     core_cbar_plotting(current_ax, mapped_image, cbar_orientation=cbar_orientation, z_order=z_order, ticks=ticks)
@@ -156,11 +158,16 @@ def single_scatter_plotting(
         y_lim=None, y_ticks=None, cutoff_value=None, cutoff_param_dict=None, x_label=None,
         x_label_format_dict=None, x_tick_labels=None, x_tick_label_format_dict=None,
         y_label=None, y_label_format_dict=None, y_tick_labels=None, y_tick_label_format_dict=None,
-        error_bar=False, error_bar_param_dict=None, scatter_line=None, line_param_dict=None, **kwargs):
+        error_bar=False, error_bar_param_dict=None, scatter_line=None, line_param_dict=None,
+        y_label_color=None, **kwargs):
     if scatter_param_dict is None:
         scatter_param_dict = {}
     if error_bar_param_dict is None:
         error_bar_param_dict = {}
+    # 可选：按子图覆盖 y 轴标签颜色（缺省 None → 不改色，保持框架现状）
+    if y_label_color is not None:
+        y_label_format_dict = dict(y_label_format_dict) if y_label_format_dict else {}
+        y_label_format_dict[ParameterName.font_color] = y_label_color
     if isinstance(complete_data_dict, list):
         for index, each_complete_data_dict in enumerate(complete_data_dict):
             if index == 0:
@@ -265,6 +272,44 @@ def single_point_variation_plotting(
         y_tick_label_format_dict=y_tick_label_format_dict)
 
 
+def draw_axis_tick_and_tick_separator_label_with_horizontal(
+        ax, transform, figure_config_dict,
+        x_label=None, x_label_format_dict=None, x_tick_labels=None, x_tick_label_format_dict=None,
+        y_label=None, y_label_format_dict=None, y_tick_labels=None, y_tick_label_format_dict=None,
+        x_tick_separator_locs=None, x_tick_separator_labels=None, x_tick_separator_label_locs=None,
+        y_tick_separator_locs=None, y_tick_separator_labels=None, y_tick_separator_label_locs=None,
+        opposite_axis=False, horizontal=False):
+    """draw_axis_tick_and_tick_separator_label wrapper with horizontal x/y swap."""
+    if horizontal:
+        draw_axis_tick_and_tick_separator_label(
+            ax, transform, figure_config_dict,
+            x_label=y_label, x_label_format_dict=y_label_format_dict,
+            x_tick_labels=y_tick_labels, x_tick_label_format_dict=y_tick_label_format_dict,
+            y_label=x_label, y_label_format_dict=x_label_format_dict,
+            y_tick_labels=x_tick_labels, y_tick_label_format_dict=x_tick_label_format_dict,
+            x_tick_separator_locs=y_tick_separator_locs,
+            x_tick_separator_labels=y_tick_separator_labels,
+            x_tick_separator_label_locs=y_tick_separator_label_locs,
+            y_tick_separator_locs=x_tick_separator_locs,
+            y_tick_separator_labels=x_tick_separator_labels,
+            y_tick_separator_label_locs=x_tick_separator_label_locs,
+            opposite_axis=opposite_axis)
+    else:
+        draw_axis_tick_and_tick_separator_label(
+            ax, transform, figure_config_dict,
+            x_label=x_label, x_label_format_dict=x_label_format_dict,
+            x_tick_labels=x_tick_labels, x_tick_label_format_dict=x_tick_label_format_dict,
+            y_label=y_label, y_label_format_dict=y_label_format_dict,
+            y_tick_labels=y_tick_labels, y_tick_label_format_dict=y_tick_label_format_dict,
+            x_tick_separator_locs=x_tick_separator_locs,
+            x_tick_separator_labels=x_tick_separator_labels,
+            x_tick_separator_label_locs=x_tick_separator_label_locs,
+            y_tick_separator_locs=y_tick_separator_locs,
+            y_tick_separator_labels=y_tick_separator_labels,
+            y_tick_separator_label_locs=y_tick_separator_label_locs,
+            opposite_axis=opposite_axis)
+
+
 def single_bar_plotting(
         current_ax, current_transform, current_array_data_dict, current_error_bar_data_dict,
         array_len, figure_config_dict, y_lim=None, y_ticks=None, cutoff_value=None, color_dict=None,
@@ -273,7 +318,7 @@ def single_bar_plotting(
         x_tick_separator_locs=None, x_tick_separator_labels=None, x_tick_separator_label_locs=None,
         y_tick_separator_locs=None, y_tick_separator_labels=None, y_tick_separator_label_locs=None,
         current_raw_scatter_data_dict=None, isolate_color_bar_mode=False, stack_different_class=False,
-        **kwargs):
+        horizontal=False, **kwargs):
     def separate_arguments_for_two_axis(argument, total_axis_num=2, extra_value_list=()):
         if argument is None or argument in extra_value_list:
             argument_list = [argument for _ in range(total_axis_num)]
@@ -337,9 +382,10 @@ def single_bar_plotting(
                 cutoff=cutoff_value, cutoff_param_dict=cutoff_param_dict,
                 max_bar_num_each_group=max_bar_num_each_group, raw_data_scatter_dict=current_raw_scatter_data_dict,
                 raw_data_scatter_param_dict=raw_data_scatter_param_dict,
-                isolate_color_bar_mode=isolate_color_bar_mode, stack_different_class=stack_different_class)
+                isolate_color_bar_mode=isolate_color_bar_mode, stack_different_class=stack_different_class,
+                horizontal=horizontal)
             if ax_index == 0:
-                draw_axis_tick_and_tick_separator_label(
+                draw_axis_tick_and_tick_separator_label_with_horizontal(
                     this_ax, this_transform, figure_config_dict,
                     x_label, x_label_format_dict, x_tick_labels, x_tick_label_format_dict,
                     y_label=this_y_label, y_label_format_dict=y_label_format_dict,
@@ -348,15 +394,17 @@ def single_bar_plotting(
                     x_tick_separator_label_locs=x_tick_separator_label_locs,
                     y_tick_separator_locs=this_y_tick_separator_locs,
                     y_tick_separator_labels=this_y_tick_separator_labels,
-                    y_tick_separator_label_locs=this_y_tick_separator_label_locs)
+                    y_tick_separator_label_locs=this_y_tick_separator_label_locs,
+                    horizontal=horizontal)
             else:
-                draw_axis_tick_and_tick_separator_label(
+                draw_axis_tick_and_tick_separator_label_with_horizontal(
                     this_ax, this_transform, figure_config_dict,
                     y_label=this_y_label, y_label_format_dict=y_label_format_dict,
                     y_tick_labels=this_y_tick_labels, y_tick_label_format_dict=y_tick_label_format_dict,
                     y_tick_separator_locs=this_y_tick_separator_locs,
                     y_tick_separator_labels=this_y_tick_separator_labels,
-                    y_tick_separator_label_locs=this_y_tick_separator_label_locs)
+                    y_tick_separator_label_locs=this_y_tick_separator_label_locs,
+                    horizontal=horizontal)
     else:
         if current_array_data_dict is not None:
             core_single_ax_bar_plot(
@@ -366,7 +414,8 @@ def single_bar_plotting(
                 cutoff=cutoff_value, cutoff_param_dict=cutoff_param_dict, twin_x_axis=twin_x_axis,
                 max_bar_num_each_group=max_bar_num_each_group, raw_data_scatter_dict=current_raw_scatter_data_dict,
                 raw_data_scatter_param_dict=raw_data_scatter_param_dict,
-                isolate_color_bar_mode=isolate_color_bar_mode, stack_different_class=stack_different_class)
+                isolate_color_bar_mode=isolate_color_bar_mode, stack_different_class=stack_different_class,
+                horizontal=horizontal)
         if twin_x_axis:
             current_ax, right_side_ax = current_ax
             if current_array_data_dict is None:
@@ -392,22 +441,23 @@ def single_bar_plotting(
                     y_tick_label_format_dict = y_tick_label_format_dict[0]
                 else:
                     right_y_tick_label_format_dict = y_tick_label_format_dict
-                axis_appearance_setting(right_side_ax, x_tick_labels=[], y_tick_labels=[])
-                draw_axis_label_and_tick_label(
-                    right_side_ax, current_transform, y_label=right_y_label,
-                    y_label_format_dict=right_y_label_format_dict, y_tick_labels=right_y_tick_labels,
-                    y_tick_label_format_dict=right_y_tick_label_format_dict, opposite_axis=True)
+                draw_axis_tick_and_tick_separator_label_with_horizontal(
+                    right_side_ax, current_transform, figure_config_dict,
+                    y_label=right_y_label, y_label_format_dict=right_y_label_format_dict,
+                    y_tick_labels=right_y_tick_labels, y_tick_label_format_dict=right_y_tick_label_format_dict,
+                    opposite_axis=True, horizontal=horizontal)
         if current_array_data_dict is None:
             current_ax.set_axis_off()
         else:
-            draw_axis_tick_and_tick_separator_label(
+            draw_axis_tick_and_tick_separator_label_with_horizontal(
                 current_ax, current_transform, figure_config_dict,
                 x_label, x_label_format_dict, x_tick_labels, x_tick_label_format_dict,
                 y_label, y_label_format_dict, y_tick_labels, y_tick_label_format_dict,
                 x_tick_separator_locs=x_tick_separator_locs, x_tick_separator_labels=x_tick_separator_labels,
                 x_tick_separator_label_locs=x_tick_separator_label_locs,
                 y_tick_separator_locs=y_tick_separator_locs, y_tick_separator_labels=y_tick_separator_labels,
-                y_tick_separator_label_locs=y_tick_separator_label_locs)
+                y_tick_separator_label_locs=y_tick_separator_label_locs,
+                horizontal=horizontal)
 
 
 def single_violin_box_distribution_plot(

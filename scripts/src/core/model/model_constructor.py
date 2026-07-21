@@ -1,5 +1,5 @@
 from ..common.config import ModelKeyword
-from ..common.functions import tissue_specific_name_constructor
+from ..common.functions import tissue_specific_name_constructor, reverse_reaction_name
 from ..common.classes import TransformDict
 
 from .model_class import EMUMIDDimDict, MFAModel, UserDefinedModel
@@ -164,3 +164,179 @@ def multiple_tissue_model_converter(tissue_specific_user_defined_model_dict):
         model_metabolite_to_standard_name_dict=complete_model_metabolite_to_standard_name_dict,
     )
     return complete_user_defined_model
+
+
+def check_attribute(model_obj):
+    try:
+        model_obj.symmetrical_metabolite_set
+    except AttributeError:
+        model_obj.symmetrical_metabolite_set = set()
+    try:
+        model_obj.added_input_metabolite_set
+    except AttributeError:
+        model_obj.added_input_metabolite_set = set()
+    try:
+        model_obj.emu_excluded_metabolite_set
+    except AttributeError:
+        model_obj.emu_excluded_metabolite_set = set()
+    try:
+        model_obj.balance_excluded_metabolite_set
+    except AttributeError:
+        model_obj.balance_excluded_metabolite_set = set()
+    try:
+        model_obj.model_compartment_set
+    except AttributeError:
+        model_obj.model_compartment_set = set()
+    try:
+        model_obj.composite_reaction_list
+    except AttributeError:
+        model_obj.composite_reaction_list = []
+    try:
+        model_obj.other_pool_metabolite_dict
+    except AttributeError:
+        model_obj.other_pool_metabolite_dict = {
+                ModelKeyword.general: model_obj.emu_excluded_metabolite_set}
+
+
+def single_model_constructor(base_model, _model_metabolite_to_standard_name_dict):
+    check_attribute(base_model)
+    return UserDefinedModel(
+            reaction_list=base_model.reaction_list,
+            symmetrical_metabolite_set=base_model.symmetrical_metabolite_set,
+            added_input_metabolite_set=base_model.added_input_metabolite_set,
+            emu_excluded_metabolite_set=base_model.emu_excluded_metabolite_set,
+            balance_excluded_metabolite_set=base_model.balance_excluded_metabolite_set,
+            target_metabolite_list=None,
+            model_compartment_set=base_model.model_compartment_set,
+            composite_reaction_list=base_model.composite_reaction_list,
+            other_pool_metabolite_dict=base_model.other_pool_metabolite_dict,
+            model_metabolite_to_standard_name_dict=_model_metabolite_to_standard_name_dict,)
+
+
+def remove_reaction(source_reaction_list, removed_reaction_id_pair_dict):
+    forward_label = 'F'
+    reverse_label = 'R'
+    bidirectional_label = 'B'
+    rxn_reversibility_label = 'reverse'
+    rxn_product_label = 'pro'
+    rxn_substrate_label = 'sub'
+    rxn_id_label = 'id'
+
+    present_ids = {rxn[rxn_id_label] for rxn in source_reaction_list}
+    unmatched_id_set = set()
+    for removed_id, remove_direction in removed_reaction_id_pair_dict.items():
+        if removed_id not in present_ids:
+            unmatched_id_set.add(removed_id)
+    if len(unmatched_id_set) > 0:
+        import warnings
+        warnings.warn(
+            f"model_combine_constructor: 下列待删反应 id 在合并模型中不存在,已忽略: {sorted(unmatched_id_set)}")
+    new_source_reaction_list = []
+    for rxn in source_reaction_list:
+        rxn_id = rxn[rxn_id_label]
+        if rxn_id in removed_reaction_id_pair_dict:
+            remove_direction = removed_reaction_id_pair_dict[rxn_id]
+            reversibility = rxn[rxn_reversibility_label] if rxn_reversibility_label in rxn else False
+            new_rxn = None
+            if not reversibility:
+                assert remove_direction == forward_label
+            else:
+                if remove_direction == bidirectional_label:
+                    pass
+                elif remove_direction == reverse_label:
+                    new_rxn = {
+                        rxn_label: rxn_content for rxn_label, rxn_content in rxn.items()
+                        if rxn_label != rxn_reversibility_label}
+                elif remove_direction == forward_label:
+                    new_rxn = {
+                        k: v for k, v in rxn.items()
+                        if k != rxn_reversibility_label}
+                    new_rxn[rxn_id_label] = reverse_reaction_name(rxn_id)
+                    new_rxn[rxn_product_label], new_rxn[rxn_substrate_label] = (
+                        rxn[rxn_substrate_label], rxn[rxn_product_label])
+                else:
+                    raise ValueError()
+            if new_rxn is not None:
+                new_source_reaction_list.append(new_rxn)
+        else:
+            new_source_reaction_list.append(rxn)
+    return new_source_reaction_list
+
+
+def model_combine_constructor(
+        base_model, specific_addon_model,
+        _model_metabolite_to_standard_name_dict,
+        removed_reaction_id_pair_dict = None,
+        removed_emu_excluded_metabolite_set = None,
+        removed_balance_excluded_metabolite_set = None,
+        removed_symmetrical_metabolite_set = None,
+        removed_added_input_metabolite_set = None,
+        removed_model_compartment_set = None,
+        removed_other_pool_metabolite_dict = None,
+):
+    check_attribute(base_model)
+    check_attribute(specific_addon_model)
+    source_reaction_list = base_model.reaction_list + specific_addon_model.extra_reaction_list
+    source_emu_excluded_metabolite_set = base_model.emu_excluded_metabolite_set | \
+        specific_addon_model.emu_excluded_metabolite_set
+    source_balance_excluded_metabolite_set = base_model.balance_excluded_metabolite_set | \
+        specific_addon_model.balance_excluded_metabolite_set
+    source_symmetrical_metabolite_set = base_model.symmetrical_metabolite_set | \
+        specific_addon_model.symmetrical_metabolite_set
+    source_added_input_metabolite_set = base_model.added_input_metabolite_set | \
+        specific_addon_model.added_input_metabolite_set
+    source_model_compartment_set = base_model.model_compartment_set | specific_addon_model.model_compartment_set
+    source_composite_reaction_list = base_model.composite_reaction_list + \
+        specific_addon_model.composite_reaction_list
+    source_other_pool_metabolite_dict = {}
+    current_other_pool_metabolite_dict = specific_addon_model.other_pool_metabolite_dict
+    for tissue_key, raw_set in base_model.other_pool_metabolite_dict.items():
+        new_set = set(raw_set)
+        if tissue_key in current_other_pool_metabolite_dict:
+            new_set |= current_other_pool_metabolite_dict[tissue_key]
+        source_other_pool_metabolite_dict[tissue_key] = new_set
+    for tissue_key, raw_set in current_other_pool_metabolite_dict.items():
+        if tissue_key not in source_other_pool_metabolite_dict:
+            source_other_pool_metabolite_dict[tissue_key] = set(raw_set)
+
+    if removed_reaction_id_pair_dict:
+        source_reaction_list = remove_reaction(source_reaction_list, removed_reaction_id_pair_dict)
+    if removed_emu_excluded_metabolite_set:
+        source_emu_excluded_metabolite_set = \
+            source_emu_excluded_metabolite_set - set(removed_emu_excluded_metabolite_set)
+    if removed_balance_excluded_metabolite_set:
+        source_balance_excluded_metabolite_set = \
+            source_balance_excluded_metabolite_set - set(removed_balance_excluded_metabolite_set)
+    if removed_symmetrical_metabolite_set:
+        source_symmetrical_metabolite_set = \
+            source_symmetrical_metabolite_set - set(removed_symmetrical_metabolite_set)
+    if removed_added_input_metabolite_set:
+        source_added_input_metabolite_set = \
+            source_added_input_metabolite_set - set(removed_added_input_metabolite_set)
+    if removed_model_compartment_set:
+        source_model_compartment_set = \
+            source_model_compartment_set - set(removed_model_compartment_set)
+    if removed_other_pool_metabolite_dict:
+        for tissue_key, met_set in removed_other_pool_metabolite_dict.items():
+            if tissue_key in source_other_pool_metabolite_dict:
+                source_other_pool_metabolite_dict[tissue_key] = \
+                    source_other_pool_metabolite_dict[tissue_key] - set(met_set)
+            else:
+                import warnings
+                warnings.warn(
+                    f"model_combine_constructor: 下列待删代谢物组织 tissue_key "
+                    f"在合并模型中不存在,已忽略: {tissue_key}: {str(met_set)}")
+
+    source_user_defined_model = UserDefinedModel(
+        reaction_list=source_reaction_list,
+        symmetrical_metabolite_set=source_symmetrical_metabolite_set,
+        added_input_metabolite_set=source_added_input_metabolite_set,
+        emu_excluded_metabolite_set=source_emu_excluded_metabolite_set,
+        balance_excluded_metabolite_set=source_balance_excluded_metabolite_set,
+        target_metabolite_list=None,
+        model_compartment_set=source_model_compartment_set,
+        composite_reaction_list=source_composite_reaction_list,
+        other_pool_metabolite_dict=source_other_pool_metabolite_dict,
+        model_metabolite_to_standard_name_dict=_model_metabolite_to_standard_name_dict,
+    )
+    return source_user_defined_model

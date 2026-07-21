@@ -38,6 +38,8 @@ class BasicBarDataFigure(DataFigure):
         ]]
         twin_x_axis = default_parameter_extract(figure_data_parameter_dict, ParameterName.twin_x_axis, False)
         broken_y_axis = default_parameter_extract(figure_data_parameter_dict, ParameterName.broken_y_axis, None)
+        self.horizontal = default_parameter_extract(
+            figure_data_parameter_dict, ParameterName.horizontal, False)
 
         (
             axis_format_dict, axis_tick_format_dict, axis_label_format_dict
@@ -158,6 +160,7 @@ class BasicBarDataFigure(DataFigure):
                 max_bar_num_each_group=self.max_bar_num_each_group,
                 current_raw_scatter_data_dict=current_raw_scatter_data_dict,
                 isolate_color_bar_mode=self.isolate_color_bar_mode, stack_different_class=self.stack_different_class,
+                horizontal=self.horizontal,
                 **tick_separator_dict)
         if self.subplot_name_list is not None:
             for subplot_name, (current_ax, current_transform) in zip(
@@ -171,6 +174,7 @@ class BasicBarDataFigure(DataFigure):
                 draw_text_by_axis_loc(
                     current_ax, supplementary_text, supplementary_loc, current_transform,
                     **self.figure_config_dict[ParameterName.supplementary_text_format_dict])
+        return ax_and_transform_list
 
 
 class BasicMIDComparisonGridBarDataFigure(BasicBarDataFigure):

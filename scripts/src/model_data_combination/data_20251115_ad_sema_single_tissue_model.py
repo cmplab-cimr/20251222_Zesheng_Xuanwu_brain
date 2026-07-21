@@ -1,7 +1,7 @@
 from .data_20251115_ad_sema import (
     DataSource, common_data_loader, model_loader, ModelList, common_model_constructor,
     Keywords, MFARunningMode, it, ModelKeyword,
-    UserDefinedMFASettings as OldUserDefinedMFASettings,
+    UserDefinedMFASettings as OldUserDefinedMFASettings, MFASettings,
     result_process_information_dict_analysis, flux_process_map_func,
     result_process_figure_config_dict_generator, tissue_mid_name_list_dict_constructor,
     tissue_flux_name_list_dict_constructor, metabolic_network_parameter_generator,
@@ -15,6 +15,13 @@ class UserDefinedMFASettings(OldUserDefinedMFASettings):
         None: 5000,
     }
     average_optimized_results = None
+    user_defined_constant_flux_dict = {
+        **MFASettings.user_defined_constant_flux_dict,
+    }
+    user_defined_specific_flux_range_dict = {
+        **MFASettings.user_defined_specific_flux_range_dict,
+        'Salvage_c': (None, (1, 10)),
+    }
 
 user_defined_mfa_settings = UserDefinedMFASettings()
 

@@ -4,6 +4,7 @@ from scripts.src.common.functions import data_param_list_generator_func_template
 from scripts.src.common.packages import it, np
 from scripts.src.io_functions.result_processing_functions import \
     mid_name_list_generator_for_multiple_labeling_substrate
+from scripts.src.io_functions.common_functions import dataset_extractor
 
 from scripts.data.data_loader import DataSource, common_data_loader
 
@@ -47,27 +48,8 @@ def return_data_content(running_mode, dataset_id=None, **kwargs):
                 'glucose__ad__semaglutide__6',
             ]
         }
-        if dataset_id is None:
-            target_mfa_data_name_list = list(it.chain(*each_data_target_mfa_data_name_list_dict.values()))
-        else:
-            try:
-                target_mfa_data_name_list = each_data_target_mfa_data_name_list_dict[dataset_id]
-            except KeyError:
-                raise KeyError(
-                    f'The dataset_id {dataset_id} is unrecognized. Feasible dataset_id '
-                    f'are {list(each_data_target_mfa_data_name_list_dict.keys())}')
-        if len(target_mfa_data_name_list) == 0:
-            new_mfa_data_dict = mfa_data_dict
-            new_mfa_information_dict = mfa_information_dict
-        else:
-            new_mfa_data_dict = {
-                mfa_data_name: mfa_data_dict[mfa_data_name]
-                for mfa_data_name in target_mfa_data_name_list
-            }
-            new_mfa_information_dict = {
-                mfa_data_name: mfa_information_dict[mfa_data_name]
-                for mfa_data_name in target_mfa_data_name_list
-            }
+        new_mfa_data_dict, new_mfa_information_dict = dataset_extractor(
+            mfa_data_dict, mfa_information_dict, dataset_id, each_data_target_mfa_data_name_list_dict)
         new_data_content = (new_mfa_data_dict, data_content_1, data_content_2, new_mfa_information_dict, data_content_4)
         return new_data_content
 
@@ -75,11 +57,11 @@ def return_data_content(running_mode, dataset_id=None, **kwargs):
 class UserDefinedMFASettings(MFASettings):
     loss_percentile = 0.005
     user_defined_constant_flux_dict = {
-        **MFASettings.user_defined_constant_flux_dict,
+        # **MFASettings.user_defined_constant_flux_dict,
     }
     user_defined_specific_flux_range_dict = {
-        **MFASettings.user_defined_specific_flux_range_dict,
-        'Salvage_c': (None, (1, 10)),
+        # **MFASettings.user_defined_specific_flux_range_dict,
+        # 'Salvage_c': (None, (1, 10)),
     }
     optimization_num_for_each_suffix_dict = {
         None: 10000,
@@ -202,8 +184,8 @@ def tissue_mid_name_list_dict_constructor(current_model_name=model_name, **kwarg
         [
             'glucose', 'pyruvate', 'lactate', 'alanine', 'acetyl-coa', ],
         [
-            'citrate/isocitrate', 'glutamate', 'glutamine', 'succinate', 'fumarate',
-            'malate', 'aspartate', ],'gut--citrate/isocitrate'
+            'citrate', 'glutamate', 'glutamine', 'succinate', 'fumarate',
+            'malate', 'aspartate', ],
     ]
 
     base_tissue_mid_name_list_dict = {

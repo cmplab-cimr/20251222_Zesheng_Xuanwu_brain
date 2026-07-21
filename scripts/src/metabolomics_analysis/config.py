@@ -1,0 +1,4 @@
+from ..inventory import MetabolomicsExperimentName
+
+
+default_data_model_name = MetabolomicsExperimentName.data_20260412_metabolomics

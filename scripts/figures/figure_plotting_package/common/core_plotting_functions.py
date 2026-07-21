@@ -200,13 +200,15 @@ def violin_box_color_list_generator(
     return data_list, data_label_list, body_color_dict_list, edge_color_dict_list, median_edge_color_dict_list
 
 
-def heatmap_value_str_generator(decimal_value, str_format):
+def heatmap_value_str_generator(x, y, decimal_value, str_format):
     if str_format == HeatmapValueFormat.raw_floating_format:
         return round_to_str_with_fixed_point(decimal_value, 4)
         # return '{:.4f}'.format(decimal_value)
     elif str_format == HeatmapValueFormat.percentage_format:
         return f'{round_to_str_with_fixed_point(decimal_value * 100, 1)}%'
         # return '{:.1%}'.format(decimal_value)
+    elif callable(str_format):
+        return str_format(x, y, decimal_value)
     else:
         if 1 < np.abs(decimal_value) < 10:
             return round_to_str_with_fixed_point(decimal_value, 2)
@@ -265,7 +267,7 @@ def heatmap_text_str_list_generator(
                         'color': current_color,
                         'zorder': z_order,
                     }
-                    text_str_list.append((x, y, heatmap_value_str_generator(value, value_number_format), kw))
+                    text_str_list.append((x, y, heatmap_value_str_generator(x, y, value, value_number_format), kw))
     return text_str_list
 
 
@@ -348,7 +350,8 @@ def heatmap_plot_wrap_func_with_text(
             current_patch = ax.add_patch(mpl_patch)
     if text_str_list is not None:
         for x, y, value_str, kw in text_str_list:
-            ax.text(x, y, value_str, **kw)
+            if value_str is not None:
+                ax.text(x, y, value_str, **kw)
     return mapper
 
 
@@ -380,10 +383,10 @@ def core_cbar_plotting(ax, plot_obj, cbar_orientation='horizontal', z_order=None
         axis_square_num = int(np.ceil(figure_width * ax_relative_width / inch_per_square))
     elif cbar_orientation == 'vertical':
         horizontal = False
-        set_bar_lim_function = ax.set_xlim
-        set_bar_tick_function = ax.set_xticks
-        set_bar_tick_label_function = ax.set_xticklabels
-        set_empty_tick_function = ax.set_yticks
+        set_bar_lim_function = ax.set_ylim
+        set_bar_tick_function = ax.set_yticks
+        set_bar_tick_label_function = ax.set_yticklabels
+        set_empty_tick_function = ax.set_xticks
         axis_square_num = int(np.ceil(figure_height * ax_relative_height / inch_per_square))
     else:
         raise ValueError()
@@ -713,7 +716,7 @@ def get_twin_axis_numeric_parameters(target_parameter, assert_func):
 
 def bar_plot_warp_func(
         ax, x_loc, data_array, width, face_color, label=None, bar_bottom=0, error_bar_data_vector=None,
-        error_bar_color=None, cap_size=None, edge_width=None, z_order=None, alpha=None):
+        error_bar_color=None, cap_size=None, edge_width=None, z_order=None, alpha=None, horizontal=False):
     if error_bar_color is None:
         try:
             error_bar_color = face_color.add_transparency(1)
@@ -731,9 +734,14 @@ def bar_plot_warp_func(
         alpha_set = False
     if alpha_set:
         alpha = None
-    ax.bar(
-        x_loc, data_array, width=width, bottom=bar_bottom, label=label,
-        color=face_color, yerr=error_bar_data_vector, error_kw=error_bar_param_dict, zorder=z_order, alpha=alpha)
+    if horizontal:
+        ax.barh(
+            x_loc, data_array, height=width, left=bar_bottom, label=label,
+            color=face_color, yerr=error_bar_data_vector, error_kw=error_bar_param_dict, zorder=z_order, alpha=alpha)
+    else:
+        ax.bar(
+            x_loc, data_array, width=width, bottom=bar_bottom, label=label,
+            color=face_color, yerr=error_bar_data_vector, error_kw=error_bar_param_dict, zorder=z_order, alpha=alpha)
 
 
 def core_single_ax_bar_plot(
@@ -741,7 +749,7 @@ def core_single_ax_bar_plot(
         bar_total_width, edge, y_lim=None, y_ticks=None, cmap=None, bar_param_dict=None, error_bar_param_dict=None,
         cutoff=None, cutoff_param_dict=None, twin_x_axis=False, max_bar_num_each_group=None,
         raw_data_scatter_dict=None, raw_data_scatter_param_dict=None,
-        isolate_color_bar_mode=False, stack_different_class=False, ):
+        isolate_color_bar_mode=False, stack_different_class=False, horizontal=False):
     def right_y_ticks_verification(_right_y_ticks):
         if isinstance(_right_y_ticks, str) and _right_y_ticks == 'default':
             return True
@@ -760,11 +768,6 @@ def core_single_ax_bar_plot(
         total_group_num = array_len
         if max_bar_num_each_group is None:
             max_bar_num_each_group = len(array_data_dict)
-    # if max_bar_num_each_group is None:
-    #     if isolate_color_bar_mode:
-    #         max_bar_num_each_group = array_len
-    #     else:
-    #         max_bar_num_each_group = len(array_data_dict)
     if array_data_dict is None:
         bar_unit_width = bar_total_width
     else:
@@ -773,22 +776,17 @@ def core_single_ax_bar_plot(
     x_left_loc = x_tick_loc - bar_total_width / 2
     if bar_param_dict is None:
         bar_param_dict = {}
-    # input_edge_width_str = 'edge_width'
-    # input_cap_size_str = 'cap_size'
-    # default_error_bar_dict = {
-    #     input_cap_size_str: 3,
-    #     input_edge_width_str: 1.5
-    # }
-    # if error_bar_param_dict is not None:
-    #     default_error_bar_dict.update(error_bar_param_dict)
     if error_bar_param_dict is None:
         error_bar_param_dict = {}
     marker_size_label = 'marker_size'
     marker_size = None
+    random_x_value = True
     if raw_data_scatter_param_dict is None:
         raw_data_scatter_param_dict = {}
     else:
         raw_data_scatter_param_dict = dict(raw_data_scatter_param_dict)
+        random_x_value = default_parameter_extract(
+            raw_data_scatter_param_dict, 'random', True, pop=True)
         if marker_size_label in raw_data_scatter_param_dict:
             marker_size = raw_data_scatter_param_dict.pop(marker_size_label)
     if array_data_dict is not None:
@@ -829,43 +827,82 @@ def core_single_ax_bar_plot(
                 current_ax = ax
             bar_plot_warp_func(
                 current_ax, x_loc, data_array, width=bar_unit_width, bar_bottom=bar_bottom,
-                face_color=current_color, label=data_label, **bar_param_dict)
+                face_color=current_color, label=data_label, horizontal=horizontal, **bar_param_dict)
             if error_bar_vector is not None:
                 if stack_different_class:
                     error_bar_data_array = bar_bottom + data_array
                 else:
                     error_bar_data_array = data_array
+                if horizontal:
+                    (
+                        error_bar_x_loc, error_bar_y_loc, error_bar_x_value, error_bar_y_value
+                    ) = (
+                        error_bar_data_array, x_loc, error_bar_vector, None)
+                else:
+                    (
+                        error_bar_x_loc, error_bar_y_loc, error_bar_x_value, error_bar_y_value
+                    ) = (
+                        x_loc, error_bar_data_array, None, error_bar_vector)
                 core_error_bar_plotting(
-                    current_ax, x_loc, error_bar_data_array, error_bar_vector, edge_color=it.repeat(current_color),
-                    **error_bar_param_dict)
+                    current_ax, x_value_array=error_bar_x_loc, y_value_array=error_bar_y_loc,
+                    y_error_bar_array=error_bar_y_value, x_error_bar_array=error_bar_x_value,
+                    edge_color=it.repeat(current_color), **error_bar_param_dict)
             if raw_data_scatter_dict is not None and data_label in raw_data_scatter_dict:
                 raw_data_matrix = raw_data_scatter_dict[data_label]
-                assert raw_data_matrix.shape[1] == total_group_num
-                raw_data_x_matrix = (random_seed.random((raw_data_matrix.shape[0], 1)) - 0.5) * bar_unit_width * 0.9 + x_loc
+                if not isolate_color_bar_mode:
+                    assert raw_data_matrix.shape[1] == total_group_num
+                if random_x_value:
+                    raw_data_x_matrix = x_loc + (random_seed.random((raw_data_matrix.shape[0], 1)) - 0.5) * bar_unit_width * 0.9
+                else:
+                    raw_data_x_matrix = x_loc
                 if stack_different_class:
                     scatter_data_array = bar_bottom + raw_data_matrix.reshape([-1])
                 else:
                     scatter_data_array = raw_data_matrix.reshape([-1])
+                sc_x = raw_data_x_matrix.reshape([-1])
+                sc_y = scatter_data_array
+                if horizontal:
+                    sc_x, sc_y = sc_y, sc_x
+                if marker_size is None or np.isscalar(marker_size):
+                    this_marker_size = marker_size
+                else:
+                    this_marker_size = marker_size[loc_index]
                 core_scatter_plotting(
-                    current_ax, raw_data_x_matrix.reshape([-1]), scatter_data_array,
-                    marker_size=marker_size, marker_color=np.reshape(current_color, (1, -1)),
+                    current_ax, sc_x, sc_y,
+                    marker_size=this_marker_size, marker_color=np.reshape(current_color, (1, -1)),
                     marker_shape='o', scatter_param_dict=raw_data_scatter_param_dict)
             if stack_different_class:
                 if isinstance(bar_bottom, int) and bar_bottom == 0:
                     bar_bottom = np.array(data_array)
                 else:
                     bar_bottom += np.array(data_array)
-    x_lim = [-edge, total_group_num + edge]
+    cat_lim = [-edge, total_group_num + edge]
     if twin_x_axis:
         ax, right_ax = ax
-        y_lim, right_y_lim = get_twin_axis_numeric_parameters(y_lim, lambda _right_y_lim: len(_right_y_lim) == 2)
-        y_ticks, right_y_ticks = get_twin_axis_numeric_parameters(
-            y_ticks, right_y_ticks_verification)
-        axis_numeric_setting(right_ax, x_lim=x_lim, x_ticks=x_tick_loc, y_lim=right_y_lim, y_ticks=right_y_ticks)
-    axis_numeric_setting(ax, x_lim=x_lim, x_ticks=x_tick_loc, y_lim=y_lim, y_ticks=y_ticks)
+        y_lim, right_y_lim = get_twin_axis_numeric_parameters(y_lim, lambda _l: len(_l) == 2)
+        y_ticks, right_y_ticks = get_twin_axis_numeric_parameters(y_ticks, right_y_ticks_verification)
+        if horizontal:
+            axis_numeric_setting(right_ax, x_lim=right_y_lim, x_ticks=right_y_ticks,
+                                y_lim=cat_lim, y_ticks=x_tick_loc)
+        else:
+            axis_numeric_setting(right_ax, x_lim=cat_lim, x_ticks=x_tick_loc,
+                                y_lim=right_y_lim, y_ticks=right_y_ticks)
+    if horizontal:
+        axis_numeric_setting(ax, x_lim=y_lim, x_ticks=y_ticks, y_lim=cat_lim, y_ticks=x_tick_loc)
+    else:
+        axis_numeric_setting(ax, x_lim=cat_lim, x_ticks=x_tick_loc, y_lim=y_lim, y_ticks=y_ticks)
     if cutoff is not None:
+        if horizontal:
+            default_axis = 'x'
+        else:
+            default_axis = 'y'
         if cutoff_param_dict is None:
-            cutoff_param_dict = {}
+            cutoff_param_dict = {'axis': default_axis}
+        else:
+            axis = cutoff_param_dict.get('axis', 'y')
+            if horizontal:
+                axis = 'x' if axis == 'y' else 'y'
+            cutoff_param_dict['axis'] = axis
         try:
             for cutoff_value in cutoff:
                 core_cutoff_plotting(ax, cutoff_value, **cutoff_param_dict)
@@ -885,13 +922,17 @@ def core_line_plotting(
 
 
 def core_error_bar_plotting(
-        ax, x_value_array, y_value_array, y_error_bar_array, x_error_bar_array=None,
+        ax, x_value_array, y_value_array, y_error_bar_array=None, x_error_bar_array=None,
         edge_color=None, edge_width=None, cap_size=None, label=None, z_order=None, data_location_cap=False, **kwargs):
     """
     If data_point_cap is True,  No data point. Cannot be used solely.
     """
 
     total_error_bar_num = len(x_value_array)
+    if x_error_bar_array is None and y_error_bar_array is None:
+        raise ValueError()
+    if y_error_bar_array is None:
+        y_error_bar_array = it.repeat(None)
     if x_error_bar_array is None:
         x_error_bar_array = it.repeat(None)
     if edge_color is None:

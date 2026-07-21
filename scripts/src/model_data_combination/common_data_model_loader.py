@@ -8,6 +8,10 @@ def common_data_model_function_loader(model_name):
         from . import data_20251115_ad_sema_serum_labeled_buffer as data_model_object
     elif model_name == ExperimentName.data_20251115_ad_sema_single_tissue_model:
         from . import data_20251115_ad_sema_single_tissue_model as data_model_object
+    elif model_name == ExperimentName.data_20251115_ad_sema_serum_labeled_buffer_tf2:
+        from . import data_20251115_ad_sema_serum_labeled_buffer_tf2 as data_model_object
+    elif model_name == ExperimentName.data_20251115_ad_sema_neuron_astrocyte_cortex_model:
+        from . import data_20251115_ad_sema_neuron_astrocyte_cortex_model as data_model_object
     else:
         raise ValueError()
     return data_model_object

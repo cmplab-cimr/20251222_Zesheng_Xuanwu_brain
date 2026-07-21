@@ -115,8 +115,6 @@ scripts/src/common/
 scripts/src/common_parallel_solver/
 scripts/src/mfa_analysis/
 scripts/src/io_functions/
-scripts/figures/common/
-scripts/figures/figure_content/
 scripts/figures/figure_elements/
 scripts/figures/figure_plotting_package/
 ```
@@ -130,6 +128,47 @@ scripts/figures/figure_plotting_package/
 1. 先与项目负责人确认
 2. 确保修改向后兼容
 3. 进行完整测试
+
+## 代码规范
+
+### 使用 ParameterName 常量
+
+构建 `figure_data_parameter_dict` 或 `figure_config_dict` 时，**必须使用 `ParameterName` 类中的字符串常量作为 key**，禁止使用裸字符串。
+
+```python
+# 正确
+from ...common.config import ParameterName
+params = {
+    ParameterName.horizontal: True,
+    ParameterName.x_tick_labels_list: labels,
+    ParameterName.figure_config_dict: {
+        ParameterName.column_width: 0.15,
+        ParameterName.edge: 0.2,
+        ParameterName.x_label_format_dict: {'font_size': 12},
+        ParameterName.supplementary_text_format_dict: {
+            ParameterName.font_size: 10,
+            ParameterName.width: 0.1,
+        },
+    },
+}
+
+# 错误 — 裸字符串
+params = {
+    'horizontal': True,
+    'x_tick_labels_list': labels,
+    'figure_config_dict': {'column_width': 0.15},
+}
+```
+
+例外：`metabolomics_style` / `common_figure_materials` 中的非框架函数（如 `recs`、`all_pct`、`x_label`、`y_label` 等作为 `default_parameter_extract` 的自定义 key）可使用裸字符串，因为它们是用户层参数，不属于框架 `ParameterName`。
+
+### Subfigure 统一模式
+
+所有 Subfigure 使用 `element = Elements.XxxFigure(**{ParameterName.figure_data_parameter_dict: params, ParameterName.scale: 0.XX, ...})` + `move_center(element, 0.XX, subfigure_size)` 模式。scale 值手动硬编码，不使用 probe 动态计算。
+
+### 文件换行规范
+
+所有代码文件（`.py`、`.md`、`.json` 等）使用 Unix 风格换行（LF），禁止 CRLF。文件末尾必须以 `\n` 结尾。
 
 ## 使用方法
 

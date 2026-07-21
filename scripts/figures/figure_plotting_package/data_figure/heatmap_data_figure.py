@@ -1,6 +1,6 @@
 from .data_figure import DataFigure
 from .data_figure_plotting_and_data_output_generator import heat_map_plotting, cbar_plotting, HeatmapValueFormat
-from .config import DataFigureConfig, ParameterName, Vector, Ellipse, Keywords, ColorConfig, \
+from .config import DataFigureConfig, ParameterName, Vector, Ellipse, ColorConfig, \
     merge_axis_format_dict, default_parameter_extract, HorizontalAlignment, VerticalAlignment
 
 
@@ -61,15 +61,25 @@ class ColorBarDataFigure(DataFigure):
         hidden_axis(axis_format_dict, axis_tick_format_dict, hidden_axis_tick, hidden_axis_boundary)
 
         self.x_ticks = default_parameter_extract(
-            figure_data_parameter_dict, ParameterName.x_ticks_list, Keywords.default, pop=True)
+            figure_data_parameter_dict, ParameterName.x_ticks_list, None, pop=True)
         self.x_tick_labels = default_parameter_extract(
-            figure_data_parameter_dict, ParameterName.x_tick_labels_list, Keywords.default, pop=True)
+            figure_data_parameter_dict, ParameterName.x_tick_labels_list, None, pop=True)
         self.x_label = default_parameter_extract(
             figure_data_parameter_dict, ParameterName.x_label_list, None, pop=True)
         self.top_x_tick_labels = default_parameter_extract(
             figure_data_parameter_dict, ParameterName.top_x_tick_labels_list, None, pop=True)
         self.top_x_label = default_parameter_extract(
             figure_data_parameter_dict, ParameterName.top_x_label_list, None, pop=True)
+        self.y_tick_labels = default_parameter_extract(
+            figure_data_parameter_dict, ParameterName.y_tick_labels_list, None, pop=True)
+        self.y_label = default_parameter_extract(
+            figure_data_parameter_dict, ParameterName.y_label_list, None, pop=True)
+        self.right_y_ticks = default_parameter_extract(
+            figure_data_parameter_dict, ParameterName.right_y_ticks_list, None, pop=True)
+        self.right_y_tick_labels = default_parameter_extract(
+            figure_data_parameter_dict, ParameterName.right_y_tick_labels_list, None, pop=True)
+        self.right_y_label = default_parameter_extract(
+            figure_data_parameter_dict, ParameterName.right_y_label_list, None, pop=True)
         x_label_format_dict = merge_axis_format_dict(
             axis_label_format_dict, DataFigureConfig.x_label_format_dict_generator(scale),
             new_figure_config_dict, ParameterName.x_label_format_dict)
@@ -82,11 +92,27 @@ class ColorBarDataFigure(DataFigure):
         top_x_tick_label_format_dict = merge_axis_format_dict(
             {}, x_tick_label_format_dict,
             new_figure_config_dict, ParameterName.top_x_tick_label_format_dict)
+        y_label_format_dict = merge_axis_format_dict(
+            axis_label_format_dict, DataFigureConfig.y_label_format_dict_generator(scale),
+            new_figure_config_dict, ParameterName.y_label_format_dict)
+        right_y_label_format_dict = merge_axis_format_dict(
+            {}, y_label_format_dict,
+            new_figure_config_dict, ParameterName.right_y_label_format_dict)
+        y_tick_label_format_dict = merge_axis_format_dict(
+            axis_label_format_dict, DataFigureConfig.y_tick_label_format_dict_generator(scale),
+            new_figure_config_dict, ParameterName.y_tick_label_format_dict)
+        right_y_tick_label_format_dict = merge_axis_format_dict(
+            {}, y_tick_label_format_dict,
+            new_figure_config_dict, ParameterName.right_y_tick_label_format_dict)
         figure_config_dict = {
             ParameterName.x_label_format_dict: x_label_format_dict,
             ParameterName.top_x_label_format_dict: top_x_label_format_dict,
             ParameterName.x_tick_label_format_dict: x_tick_label_format_dict,
             ParameterName.top_x_tick_label_format_dict: top_x_tick_label_format_dict,
+            ParameterName.y_label_format_dict: y_label_format_dict,
+            ParameterName.right_y_label_format_dict: right_y_label_format_dict,
+            ParameterName.y_tick_label_format_dict: y_tick_label_format_dict,
+            ParameterName.right_y_tick_label_format_dict: right_y_tick_label_format_dict,
         }
 
         super().__init__(
@@ -105,7 +131,10 @@ class ColorBarDataFigure(DataFigure):
         cbar_plotting(
             data_figure_axis, data_figure_transform, mapped_image, self.cbar_orientation,
             x_label=self.x_label, x_ticks=self.x_ticks, x_tick_labels=self.x_tick_labels,
-            top_x_label=self.top_x_label, top_x_tick_labels=self.top_x_tick_labels, **self.figure_config_dict)
+            top_x_label=self.top_x_label, top_x_tick_labels=self.top_x_tick_labels,
+            y_label=self.y_label, y_tick_labels=self.y_tick_labels,
+            right_y_label=self.right_y_label, right_y_ticks=self.right_y_ticks, right_y_tick_labels=self.right_y_tick_labels,
+            **self.figure_config_dict)
 
 
 class BasicHeatmapDataFigure(DataFigure):
@@ -224,10 +253,16 @@ class BasicHeatmapDataFigure(DataFigure):
         else:
             highlight = False
         self.highlight = highlight
-        self.highlight_obj = None
+        self.highlight_obj_list = []
         if highlight:
             highlight_config_dict = figure_data_parameter_dict[ParameterName.highlight_config]
-            self.highlight_obj = Ellipse(**highlight_config_dict)
+            if isinstance(highlight_config_dict, dict):
+                self.highlight_obj_list.append(Ellipse(**highlight_config_dict))
+            elif isinstance(highlight_config_dict, list) and len(highlight_config_dict[0]) == 2:
+                for highlight_class, highlight_config in highlight_config_dict:
+                    self.highlight_obj_list.append(highlight_class(**highlight_config))
+            else:
+                raise ValueError()
 
         super().__init__(
             bottom_left, size, [main_ax_bottom_left], [main_ax_size],
@@ -250,5 +285,6 @@ class BasicHeatmapDataFigure(DataFigure):
         if self.cbar:
             self.cbar_obj.draw(fig, parent_ax, parent_transformation, mapped_image=heatmap_image)
         if self.highlight:
-            self.highlight_obj.draw(fig, data_figure_axis, data_figure_axis.transData)
+            for highlight_obj in self.highlight_obj_list:
+                highlight_obj.draw(fig, data_figure_axis, data_figure_axis.transData)
 

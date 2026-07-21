@@ -54,3 +54,28 @@ def tissue_specific_flux_list_constructor(all_tissue_flux_name_list_dict, displa
                 tissue_specific_display_flux_dict[new_tissue_specific_flux_name] = tissue_specific_display_flux_name
             flux_name_list.append(new_mid_name_row)
     return flux_name_list, tissue_specific_display_flux_dict
+
+
+def dataset_extractor(mfa_data_dict, mfa_information_dict, dataset_id, complete_dataset_dict):
+    if dataset_id is None:
+        target_mfa_data_name_list = []
+    else:
+        try:
+            target_mfa_data_name_list = complete_dataset_dict[dataset_id]
+        except KeyError:
+            raise KeyError(
+                f'The dataset_id {dataset_id} is unrecognized. Feasible dataset_id '
+                f'are {list(complete_dataset_dict.keys())}')
+    if len(target_mfa_data_name_list) == 0:
+        new_mfa_data_dict = mfa_data_dict
+        new_mfa_information_dict = mfa_information_dict
+    else:
+        new_mfa_data_dict = {
+            mfa_data_name: mfa_data_dict[mfa_data_name]
+            for mfa_data_name in target_mfa_data_name_list
+        }
+        new_mfa_information_dict = {
+            mfa_data_name: mfa_information_dict[mfa_data_name]
+            for mfa_data_name in target_mfa_data_name_list
+        }
+    return new_mfa_data_dict, new_mfa_information_dict

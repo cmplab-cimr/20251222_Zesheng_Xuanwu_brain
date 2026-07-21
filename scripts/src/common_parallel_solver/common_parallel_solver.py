@@ -325,6 +325,30 @@ def parallel_solver_wrap(
     return 0
 
 
+def print_test_info(result_label, slsqp_obj, mfa_config):
+    prefix_1 = ' ' * 3
+    prefix_2 = ' ' * 6
+    emu_list = [f'{result_label}: emu_name to experimental_name mapping: ']
+    for emu_key, experimental_name in slsqp_obj.emu_name_experimental_name_dict.items():
+        emu_list.append(f'{prefix_1}{emu_key}:   {experimental_name}')
+    flux_constant_and_range_list = [
+        f'{result_label}: specific constant flux and flux range:',
+        f'{prefix_1}constant fluxes:'
+    ]
+    for flux_name, flux_value in mfa_config.preset_constant_flux_value_dict.items():
+        if flux_name in slsqp_obj.flux_name_index_dict:
+            flux_constant_and_range_list.append(f'{prefix_2}{flux_name}: {flux_value}')
+    flux_constant_and_range_list.append(f'{prefix_1}flux range:')
+    for flux_name, flux_range in mfa_config.specific_flux_range_dict.items():
+        if flux_name in slsqp_obj.flux_name_index_dict:
+            flux_constant_and_range_list.append(f'{prefix_2}{flux_name}: [{flux_range[0]}, {flux_range[1]}]')
+    output_list = [
+        *emu_list,
+        *flux_constant_and_range_list
+    ]
+    print('\n'.join(output_list))
+
+
 def serial_solver_wrap(
         result_list, final_result_obj, total_optimization_num, test_mode, parallel_parameter_dict,
         docker_mode, progress_bar):
@@ -337,10 +361,11 @@ def serial_solver_wrap(
             base_solver_obj, mfa_config, this_case_optimization_num, result_label, result_information,
             each_case_target_optimization_num) in result_list:
         initial_flux_input = None
+        not_solve = False
         if isinstance(this_case_optimization_num, int):
             if this_case_optimization_num == 0:
                 print(f'No solutions of {result_label} needs to be obtained.')
-                continue
+                not_solve = True
             else:
                 print(f'{result_label} started: {this_case_optimization_num} solutions need to be obtained.')
         elif isinstance(this_case_optimization_num, (list, np.ndarray)):
@@ -349,6 +374,8 @@ def serial_solver_wrap(
         else:
             raise ValueError()
         if batch_solving:
+            if not_solve:
+                continue
             new_solving_process = mp.Process(
                 target=batch_continuously_solving_func, args=(
                     final_result_obj, result_label, result_information, base_solver_obj, mfa_config, initial_flux_input,
@@ -359,22 +386,19 @@ def serial_solver_wrap(
             new_solving_process.close()
         else:
             slsqp_obj = specific_solver_constructor(base_solver_obj, mfa_config)
-            print('emu_name to experimental_name mapping: ')
-            print(
-                '\n'.join([
-                    f'{emu_key}:   {experimental_name}'
-                    for emu_key, experimental_name in slsqp_obj.emu_name_experimental_name_dict.items()
-                ]))
+            print_test_info(result_label, slsqp_obj, mfa_config)
             progress_bar.start()
             if initial_flux_input is None:
                 initial_flux_input = universal_feasible_solution_generator(
-                    slsqp_obj, this_case_optimization_num, display_progress_bar=True)
+                    slsqp_obj, max(this_case_optimization_num, 1), display_progress_bar=True)
             if initial_flux_input is None:
                 print(f'{result_label} failed to generate initial flux')
             else:
                 print('Initial flux generated')
                 result_list = slsqp_solving(
                     slsqp_obj, initial_flux_input, verbose=not test_mode)
+                if not_solve:
+                    continue
                 send_pipe.send(this_case_optimization_num)
                 print(f'{result_label} ended')
                 final_result_obj.add_and_save_result(
@@ -463,36 +487,40 @@ def solver_and_solution_list_construct(
                 result_label, final_result_obj, (mfa_model, mfa_data, mfa_config), this_case_target_optimization_num)
         else:
             new_optimization_num = this_case_target_optimization_num
-        if new_optimization_num == 0:
+        if new_optimization_num == 0 and not test_mode:
             print(f'No solution of {result_label} need to be obtained. Abort')
             continue
         base_solver_obj = base_solver_constructor(mfa_model, mfa_data, mfa_config, verbose=test_mode)
         base_solver_obj.base_initialize_solver()
-        if Keywords.unoptimized in mfa_config.miscellaneous_config:
-            print(f'Generating {new_optimization_num} number of unoptimized solutions...')
-            generate_unoptimized_solutions(
-                mfa_config, new_optimization_num, final_result_obj, base_solver_obj, result_label,
-                result_information, this_case_target_optimization_num)
-            print(f'{new_optimization_num} number of unoptimized solutions have been saved.')
-            continue
-        elif Keywords.predefined_initial_solution_matrix in mfa_config.miscellaneous_config:
-            predefined_solution_flux_matrix = predefined_solution_flux_matrix[-new_optimization_num:]
-            if parallel_parameters is None:
-                each_case_iter = predefined_solution_flux_matrix
+        if new_optimization_num == 0:
+            print(f'No solution of {result_label} need to be obtained. Only print info in test mode')
+            each_case_iter = 0
+        else:
+            if Keywords.unoptimized in mfa_config.miscellaneous_config:
+                print(f'Generating {new_optimization_num} number of unoptimized solutions...')
+                generate_unoptimized_solutions(
+                    mfa_config, new_optimization_num, final_result_obj, base_solver_obj, result_label,
+                    result_information, this_case_target_optimization_num)
+                print(f'{new_optimization_num} number of unoptimized solutions have been saved.')
+                continue
+            elif Keywords.predefined_initial_solution_matrix in mfa_config.miscellaneous_config:
+                predefined_solution_flux_matrix = predefined_solution_flux_matrix[-new_optimization_num:]
+                if parallel_parameters is None:
+                    each_case_iter = predefined_solution_flux_matrix
+                else:
+                    print(f'{new_optimization_num} initial value of {result_label} loaded')
+                    each_case_iter = each_case_optimization_distribution_iter_generator(
+                        new_optimization_num, each_process_optimization_num, solver_obj=base_solver_obj,
+                        total_initial_flux_input=predefined_solution_flux_matrix,
+                        result_label=result_label)
+            elif parallel_parameters is None or batch_solving:
+                each_case_iter = new_optimization_num
             else:
-                print(f'{new_optimization_num} initial value of {result_label} loaded')
+                print(f'{new_optimization_num} initial value of {result_label} needs to be generated')
                 each_case_iter = each_case_optimization_distribution_iter_generator(
                     new_optimization_num, each_process_optimization_num, solver_obj=base_solver_obj,
-                    total_initial_flux_input=predefined_solution_flux_matrix,
-                    result_label=result_label)
-        elif parallel_parameters is None or batch_solving:
-            each_case_iter = new_optimization_num
-        else:
-            print(f'{new_optimization_num} initial value of {result_label} needs to be generated')
-            each_case_iter = each_case_optimization_distribution_iter_generator(
-                new_optimization_num, each_process_optimization_num, solver_obj=base_solver_obj,
-                max_optimization_each_generation=max_optimization_each_generation,
-                result_label=result_label, initial_processes_num=initial_processes_num)
+                    max_optimization_each_generation=max_optimization_each_generation,
+                    result_label=result_label, initial_processes_num=initial_processes_num)
         total_optimization_num += new_optimization_num
         result_list.append((
             base_solver_obj, mfa_config, each_case_iter, result_label, result_information,

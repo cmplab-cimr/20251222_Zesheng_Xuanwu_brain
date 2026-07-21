@@ -208,24 +208,85 @@ def generate_valid_lb_ub_bounds_and_obj(
         total_bound_obj_num, variable_num, min_value_vector, max_value_vector, random_min_factor, random_max_factor,
         random_seed):
 
-    def generate_min_factor_bound():
-        return 1 + random_seed.random([total_bound_obj_num, variable_num]) * random_min_factor
+    # def generate_min_factor_bound():
+    #     return 1 + random_seed.random([total_bound_obj_num, variable_num]) * random_min_factor
+    #
+    # def generate_max_factor_bound():
+    #     return random_seed.random([total_bound_obj_num, variable_num]) * random_max_factor + (1 - random_max_factor)
+    #
+    # def clip_to_bound(raw_vector):
+    #     clipped_vector = np.clip(raw_vector, min_value_vector, max_value_vector)
+    #     return clipped_vector
+    #
+    # min_value_vector_for_ratio_calculation = np.where(
+    #     min_value_vector >= 0,
+    #     np.clip(min_value_vector, 1e-9, None),
+    #     np.clip(min_value_vector, None, 1e-9))
+    # # min_value_vector_for_ratio_calculation = np.clip(
+    # #     min_value_vector, 1e-9, None)
+    # max_to_min_ratio_vector = max_value_vector / min_value_vector_for_ratio_calculation
+    # min_to_max_ratio_vector = min_value_vector / max_value_vector
+    # assert np.all(np.isfinite(max_to_min_ratio_vector))
+    # assert np.all(np.isfinite(min_to_max_ratio_vector))
+    # max_to_min_ratio_offset = max_to_min_ratio_vector - 1
+    #
+    # adjusted_random_min_factor = np.where(
+    #     max_to_min_ratio_offset < random_min_factor * 2,
+    #     max_to_min_ratio_offset / 2,
+    #     random_min_factor,
+    # )
+    # adjusted_random_max_factor = np.where(
+    #     min_to_max_ratio_vector > random_max_factor * 2,
+    #     min_to_max_ratio_vector / 2,
+    #     random_max_factor,
+    # )
+    #
+    # # This may generate wrong solution when self.min_value_vector is smaller than 0
+    # raw_lb_generated_by_min_factor = min_value_vector * generate_min_factor_bound()
+    # raw_lb_generated_by_max_factor = min_value_vector * generate_max_factor_bound()
+    # raw_lb = np.where(min_value_vector >= 0, raw_lb_generated_by_min_factor, raw_lb_generated_by_max_factor)
+    # clipped_lb = clip_to_bound(raw_lb)
+    # raw_ub = max_value_vector * generate_max_factor_bound()
+    # clipped_ub = clip_to_bound(raw_ub)
 
-    def generate_max_factor_bound():
-        return random_seed.random([total_bound_obj_num, variable_num]) * random_max_factor + (1 - random_max_factor)
+    gap = max_value_vector - min_value_vector  # (variable_num,)
+    assert np.all(gap > 0), f'max_value_vector 必须大于 min_value_vector, 但存在 gap ≤ 0 的变量'
+    assert np.all(max_value_vector > 0), '仅支持 max_value_vector 均大于 0 的场景'
+    assert np.all(np.abs(min_value_vector) > 1e-10) and np.all(np.abs(max_value_vector) > 1e-10), \
+        '仅支持 min_value_vector 和 max_value_vector 绝对值大于 1e-10 的场景'
+    # 自适应缩放因子：当 gap 小时限制缩放幅度，使 lb 和 ub 天生保持间距
+    # lb = min*(1+ε)，要求 lb ≤ min + 0.45*gap → ε ≤ 0.45*gap/min
+    # ub = max*(1-δ)，要求 ub ≥ max - 0.45*gap → δ ≤ 0.45*gap/max
+    # 最坏情况 lb 和 ub 之间至少留 0.1*gap 的间距
+    min_gap = gap * 0.1
+    max_gap = 0.45 * gap
+    eps_cap = np.where(
+        min_value_vector > 0,
+        np.minimum(random_min_factor, max_gap / min_value_vector),
+        random_min_factor)
+    delta_cap = np.where(
+        max_value_vector > 0,
+        np.minimum(random_max_factor, max_gap / max_value_vector),
+        random_max_factor)
 
-    def clip_to_bound(raw_vector):
-        clipped_vector = np.clip(raw_vector, min_value_vector, max_value_vector)
-        return clipped_vector
+    def random_variable_matrix():
+        return random_seed.random([total_bound_obj_num, variable_num])
 
-    # This may generate wrong solution when self.min_value_vector is smaller than 0
-    raw_lb_generated_by_min_factor = min_value_vector * generate_min_factor_bound()
-    raw_lb_generated_by_max_factor = min_value_vector * generate_max_factor_bound()
-    raw_lb = np.where(min_value_vector >= 0, raw_lb_generated_by_min_factor, raw_lb_generated_by_max_factor)
-    clipped_lb = clip_to_bound(raw_lb)
-    raw_ub = max_value_vector * generate_max_factor_bound()
-    clipped_ub = clip_to_bound(raw_ub)
-    bounds = np.transpose(np.array([clipped_lb, clipped_ub]), axes=(1, 2, 0))
+    # lb: 当 min >= 0 时用 (1+ε) 放大，当 min < 0 时用 (1-δ) 缩小
+    raw_lb = np.where(
+        min_value_vector >= 0,
+        min_value_vector * (1 + random_variable_matrix() * eps_cap),
+        min_value_vector * (random_variable_matrix() * delta_cap + (1 - delta_cap)))
+
+    raw_ub = max_value_vector * (
+        random_variable_matrix() * delta_cap + (1 - delta_cap))
+
+    # 断言验证：min < lb, lb + min_gap ≤ ub < max
+    assert np.all(raw_lb - min_value_vector > 1e-10), 'raw_lb 必须大于 min_value_vector'
+    assert np.all(max_value_vector - raw_ub > 1e-10), 'raw_ub 必须小于 max_value_vector'
+    assert np.all(raw_ub - raw_lb >= min_gap * 0.99), 'raw_lb 和 raw_ub 之间必须至少有 min_gap 的间距'
+
+    bounds = np.transpose(np.array([raw_lb, raw_ub]), axes=(1, 2, 0))
     obj_array = random_seed.random([total_bound_obj_num, variable_num]) - 0.4
     return bounds, obj_array
 

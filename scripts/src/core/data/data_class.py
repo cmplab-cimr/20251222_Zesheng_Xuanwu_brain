@@ -678,6 +678,32 @@ class MFAData(object):
             **new_labeled_buffer_input_metabolite_obj_dict,
         }
 
+    def replace_tissue_in_mid_data(
+            self, old_tissue_list, new_tissue_list, copy=False):
+        assert isinstance(old_tissue_list, (list, tuple))
+        assert isinstance(new_tissue_list, (list, tuple))
+        old_tissue_tuple = tuple(old_tissue_list)
+        new_tissue_tuple = tuple(new_tissue_list)
+        old_experimental_mid_data_obj_dict = self.experimental_mid_data_obj_dict
+        new_experimental_mid_data_obj_dict = {}
+        for raw_mid_name, each_mid_data_obj in old_experimental_mid_data_obj_dict.items():
+            if copy:
+                new_each_each_mid_data_obj = each_mid_data_obj.copy()
+            else:
+                new_each_each_mid_data_obj = each_mid_data_obj
+            if each_mid_data_obj.tissue == old_tissue_tuple:
+                new_each_each_mid_data_obj.change_tissue(new_tissue_tuple)
+                new_mid_name = new_each_each_mid_data_obj.full_name
+                new_experimental_mid_data_obj_dict[new_mid_name] = new_each_each_mid_data_obj
+            else:
+                new_experimental_mid_data_obj_dict[raw_mid_name] = new_each_each_mid_data_obj
+        if copy:
+            final_obj = self.copy()
+        else:
+            final_obj = self
+        final_obj.experimental_mid_data_obj_dict = new_experimental_mid_data_obj_dict
+        return final_obj
+
 
 def average_multiple_mfa_data(mfa_data_list, output_std=False, common_data_name=None, filter_excluded_from_mfa=False):
     def average_experimental_mid_data_obj_dict(mid_data_obj_dict_list):

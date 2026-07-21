@@ -79,7 +79,8 @@ class BasicScatterDataFigure(DataFigure):
             self.y_label_list,
             self.y_ticks_list,
             self.y_tick_labels_list,
-            self.figure_type
+            self.figure_type,
+            self.y_label_color_list
         ) = [
             figure_data_parameter_dict[key]
             if key in figure_data_parameter_dict and figure_data_parameter_dict[key] is not None
@@ -94,7 +95,8 @@ class BasicScatterDataFigure(DataFigure):
                 ParameterName.y_label_list,
                 ParameterName.y_ticks_list,
                 ParameterName.y_tick_labels_list,
-                ParameterName.figure_type
+                ParameterName.figure_type,
+                'y_label_color_list'
             )]
         self.error_bar = default_parameter_extract(
             figure_data_parameter_dict, ParameterName.error_bar, False)
@@ -120,15 +122,17 @@ class BasicScatterDataFigure(DataFigure):
         ax_and_transform_list = super().draw(fig, parent_ax, parent_transformation)
         for (
                 complete_data_dict, (current_ax, current_transform), x_lim, x_label, x_ticks, x_tick_labels, y_lim,
-                y_label, y_ticks, y_tick_labels, cutoff_value, scatter_line) in zip(
+                y_label, y_ticks, y_tick_labels, cutoff_value, scatter_line, y_label_color) in zip(
                 self.complete_data_dict_list, ax_and_transform_list, self.x_lim_list, self.x_label_list,
                 self.x_ticks_list, self.x_tick_labels_list, self.y_lim_list, self.y_label_list, self.y_ticks_list,
-                self.y_tick_labels_list, self.cutoff_value_list, self.complete_scatter_line_list):
+                self.y_tick_labels_list, self.cutoff_value_list, self.complete_scatter_line_list,
+                self.y_label_color_list):
             single_scatter_plotting(
                 current_ax, current_transform, complete_data_dict, x_lim=x_lim, x_ticks=x_ticks, x_label=x_label,
                 x_tick_labels=x_tick_labels, y_lim=y_lim, y_ticks=y_ticks,
                 y_label=y_label, y_tick_labels=y_tick_labels, cutoff_value=cutoff_value,
-                scatter_line=scatter_line, error_bar=self.error_bar, **self.figure_config_dict)
+                scatter_line=scatter_line, error_bar=self.error_bar, y_label_color=y_label_color,
+                **self.figure_config_dict)
         if self.subplot_name_list is not None:
             for subplot_name, (current_ax, current_transform) in zip(self.subplot_name_list, ax_and_transform_list):
                 draw_text_by_axis_loc(

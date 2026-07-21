@@ -19,6 +19,7 @@ class Keywords(object):
     mid_prediction = 'mid_prediction'
     flux_comparison = 'flux_comparison'
     tissue = 'tissue'
+    average = 'average'
 
 
 class DataType(object):

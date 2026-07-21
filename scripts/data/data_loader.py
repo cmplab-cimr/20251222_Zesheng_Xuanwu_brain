@@ -1,5 +1,8 @@
 class DataSource(object):
     data_20251115_ad_sema = 'data_20251115_ad_sema'
+    data_20260412_metabolomics = 'data_20260412_metabolomics'
+    metabolomics_behavioral = 'metabolomics_behavioral'
+    flux_behavioral = 'flux_behavioral'
 
 
 def specific_data_dict_loader(specific_parameter, reload=False, **kwargs):
@@ -36,14 +39,23 @@ def specific_data_dict_loader(specific_parameter, reload=False, **kwargs):
 
 
 def common_data_loader(data_type, keyword_only=False, **kwargs):
+    from .data_20251115_ad_sema.specific_data_parameters import Keyword
     if data_type == DataSource.data_20251115_ad_sema:
-        from .data_20251115_ad_sema.specific_data_parameters import SpecificParameters, Keyword
-    else:
-        raise ValueError()
-    if not keyword_only:
-        specific_parameters = SpecificParameters()
-        content = specific_data_dict_loader(specific_parameters, **kwargs)
-    else:
-        content = None
-    keyword = Keyword()
-    return content, keyword
+        from .data_20251115_ad_sema.specific_data_parameters import SpecificParameters
+        content = (specific_data_dict_loader(SpecificParameters(), **kwargs)
+                   if not keyword_only else None)
+        return content, Keyword()
+    if data_type == DataSource.data_20260412_metabolomics:
+        from .data_20260412_metabolomics.metabolomic_data_loader import MetabolomicDataset
+        content = (None if keyword_only
+                   else MetabolomicDataset(min_msi_level=kwargs.get('min_msi_level', '3')))
+        return content, Keyword()
+    if data_type == DataSource.metabolomics_behavioral:
+        from .metabolomics_flux_behaviroal_data_loader.behavioral_data_loader import load_behavioral_data
+        content = None if keyword_only else load_behavioral_data('metabolomics')
+        return content, Keyword()
+    if data_type == DataSource.flux_behavioral:
+        from .metabolomics_flux_behaviroal_data_loader.behavioral_data_loader import load_behavioral_data
+        content = None if keyword_only else load_behavioral_data('flux')
+        return content, Keyword()
+    raise ValueError(f'未知 data_type: {data_type}')

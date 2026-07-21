@@ -346,6 +346,7 @@ class ParameterName(object):
     patch_text_distance_ratio = 'patch_text_distance_ratio'
     legend_patch_config_dict = 'legend_patch_config_dict'
     location_config_dict = 'location_config_dict'
+    random = 'random'
 
     error_bar = 'error_bar'
     error_bar_param_dict = 'error_bar_param_dict'
