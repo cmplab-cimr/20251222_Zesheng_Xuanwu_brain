@@ -39,48 +39,55 @@ def flux_comparison_generator(
             current_ax_data_list = []
             current_ax_position_list = []
             current_ax_color_list = []
-            current_flux_data_dict = final_flux_comparison_data_dict[flux_name]
             current_x_tick_labels = []
-            group_class_dict = {}
-            for group_data_dict in current_flux_data_dict.values():
-                group_class_dict.update(group_data_dict)
-            max_class_num = len(group_class_dict)
-            total_group_num = len(current_flux_data_dict)
-            each_column_width_inside_group = \
-                column_width / (max_class_num + gap_inside_column * (max_class_num - 1))
-            absolute_gap = each_column_width_inside_group * gap_inside_column
-            min_column_width = np.minimum(min_column_width, each_column_width_inside_group)
-            # In this part, group is different patient/sample, while class is different condition.
-            for group_index, (group_name, group_data_dict) in enumerate(current_flux_data_dict.items()):
-                group_location = group_index + 1
-                for class_index, class_name in enumerate(group_class_dict.keys()):
-                    data_array = group_data_dict[class_name]
-                    current_ax_data_list.append(data_array)
-                    current_ax_position_list.append(
-                        group_location - column_width / 2 +
-                        (each_column_width_inside_group + absolute_gap) * class_index +
-                        each_column_width_inside_group / 2)
-                    current_ax_color_list.append(color_dict[class_name])
-                if group_name in display_group_name_dict:
-                    display_group_name = display_group_name_dict[group_name]
-                else:
-                    display_group_name = group_name
-                current_x_tick_labels.append(display_group_name)
+            current_x_ticks_list = []
+
+            if flux_name is not None:
+                current_flux_data_dict = final_flux_comparison_data_dict[flux_name]
+                group_class_dict = {}
+                for group_data_dict in current_flux_data_dict.values():
+                    group_class_dict.update(group_data_dict)
+                max_class_num = len(group_class_dict)
+                total_group_num = len(current_flux_data_dict)
+                each_column_width_inside_group = \
+                    column_width / (max_class_num + gap_inside_column * (max_class_num - 1))
+                absolute_gap = each_column_width_inside_group * gap_inside_column
+                min_column_width = np.minimum(min_column_width, each_column_width_inside_group)
+                # In this part, group is different patient/sample, while class is different condition.
+                for group_index, (group_name, group_data_dict) in enumerate(current_flux_data_dict.items()):
+                    group_location = group_index + 1
+                    for class_index, class_name in enumerate(group_class_dict.keys()):
+                        data_array = group_data_dict[class_name]
+                        current_ax_data_list.append(data_array)
+                        current_ax_position_list.append(
+                            group_location - column_width / 2 +
+                            (each_column_width_inside_group + absolute_gap) * class_index +
+                            each_column_width_inside_group / 2)
+                        current_ax_color_list.append(color_dict[class_name])
+                    if group_name in display_group_name_dict:
+                        display_group_name = display_group_name_dict[group_name]
+                    else:
+                        display_group_name = group_name
+                    current_x_tick_labels.append(display_group_name)
+                current_x_ticks_list = list(range(1, total_group_num + 1))
+                group_num_x_lim = (0.5, total_group_num + 0.5)
+            else:
+                group_num_x_lim = None
 
             if flux_name in display_flux_name_dict:
                 display_flux_name = display_flux_name_dict[flux_name]
             else:
                 display_flux_name = flux_name
             flux_name_list.append(display_flux_name)
-            x_ticks_list.append(list(range(1, total_group_num + 1)))
+            x_ticks_list.append(current_x_ticks_list)
             data_nested_list.append(current_ax_data_list)
             positions_list.append(current_ax_position_list)
             y_tick_labels_list.append(Keywords.default)
             if preset_x_lim_list is not None:
-                x_lim = preset_x_lim_list[row_index][col_index]
+                current_x_lim = preset_x_lim_list[row_index][col_index]
             else:
-                x_lim = (0.5, total_group_num + 0.5)
-            x_lim_list.append(x_lim)
+                current_x_lim = group_num_x_lim
+            x_lim_list.append(current_x_lim)
             if preset_y_lim_list is not None:
                 y_lim = preset_y_lim_list[row_index][col_index]
             else:

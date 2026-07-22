@@ -10,9 +10,9 @@ class ExperimentName(ValueEnum):
 
 # default_data_model_name = ExperimentName.data_20251115_ad_sema
 # default_data_model_name = ExperimentName.data_20251115_ad_sema_serum_labeled_buffer
-# default_data_model_name = ExperimentName.data_20251115_ad_sema_single_tissue_model
+default_data_model_name = ExperimentName.data_20251115_ad_sema_single_tissue_model
 # default_data_model_name = ExperimentName.data_20251115_ad_sema_serum_labeled_buffer_tf2
-default_data_model_name = ExperimentName.data_20251115_ad_sema_neuron_astrocyte_cortex_model
+# default_data_model_name = ExperimentName.data_20251115_ad_sema_neuron_astrocyte_cortex_model
 
 
 class MetabolomicsExperimentName(ValueEnum):

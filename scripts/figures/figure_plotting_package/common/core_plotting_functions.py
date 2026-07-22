@@ -554,6 +554,8 @@ def core_plot_violin_box_plot(
         obj.set(**param_dict)
 
     assert len(data_list) == len(positions)
+    if len(data_list) == 0:
+        return
     # color_list could be inserted into body_props
     # try:
     #     body_props_list = box_violin_config_dict['body_props']

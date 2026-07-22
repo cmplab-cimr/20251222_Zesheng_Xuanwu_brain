@@ -941,7 +941,7 @@ def flux_comparison_plotting_func_template(
         # preprocessed_flux_data_dict, all_tissue_flux_name_list_dict, display_flux_dict = preprocess_flux_data(
         #     solution_array_dict, final_flux_name_index_dict, subset_index_dict)
 
-        tissue_tissue_flux_name_list_dict_info = tissue_flux_name_list_dict_constructor()
+        tissue_tissue_flux_name_list_dict_info = tissue_flux_name_list_dict_constructor(experiment_name)
         if len(tissue_tissue_flux_name_list_dict_info) == 5:
             (
                 all_tissue_flux_name_list_dict, display_flux_dict, display_tissue_dict,

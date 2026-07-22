@@ -89,6 +89,8 @@ def result_process_information_dict_analysis(complete_result_information_dict, t
     if target == Keywords.mid_prediction:
         for result_label, current_result_information_dict in complete_result_information_dict.items():
             major_key = data_name
+            if len(current_result_information_dict) == 0:
+                continue
             condition = current_result_information_dict[keyword.condition]
             index = current_result_information_dict[keyword.index]
             minor_key_list = []
@@ -107,6 +109,8 @@ def result_process_information_dict_analysis(complete_result_information_dict, t
         }
         complete_result_label_information_dict_dict = {}
         for result_label, current_result_information_dict in complete_result_information_dict.items():
+            if len(current_result_information_dict) == 0:
+                continue
             condition = current_result_information_dict[keyword.condition]
             index = current_result_information_dict[keyword.index]
             identity_tuple = (condition, index)
