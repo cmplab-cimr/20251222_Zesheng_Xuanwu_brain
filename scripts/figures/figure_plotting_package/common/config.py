@@ -317,6 +317,7 @@ class ParameterName(object):
     horiz_or_vertical = 'horiz_or_vertical'
     supplementary_text_list = 'supplementary_text_list'
     supplementary_text_loc_list = 'supplementary_text_loc_list'
+    supplementary_text_color_list = 'supplementary_text_color_list'
     supplementary_text_format_dict = 'supplementary_text_format_dict'
     p_value_y_value_list = 'p_value_y_value_list'
     p_value_cap_parameter_dict = 'p_value_cap_parameter_list'
@@ -351,6 +352,7 @@ class ParameterName(object):
     error_bar = 'error_bar'
     error_bar_param_dict = 'error_bar_param_dict'
     scatter_line = 'scatter_line'
+    scatter_fill = 'scatter_fill'
 
     cbar = 'cbar'
     cbar_config = 'cbar_config'

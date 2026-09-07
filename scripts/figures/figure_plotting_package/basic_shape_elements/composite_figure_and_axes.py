@@ -445,7 +445,15 @@ class Figure(CompositeFigure):
             self.figure_output_direct = figure_output_direct
         super().__init__(figure_element_dict, bottom_left, size, name=figure_name)
 
-    def draw(self, fig=None, parent_ax=None, parent_transformation=None, output_svg=False, background=False):
+    def draw(
+            self, fig=None, parent_ax=None, parent_transformation=None,
+            output_svg=False, background=False, save=True):
+        """Render the figure and optionally save it through the legacy single-file path.
+
+        Returning the Matplotlib figure lets callers compose several independently
+        laid-out pages into one PDF while keeping all existing ``draw()`` calls
+        backward compatible.
+        """
         fig = plt.figure(figsize=self.figure_size, dpi=self.dpi)
         height_width_distortion = Vector(1, 1 / self.height_to_width_ratio)
         axis_bottom_left = self.bottom_left * height_width_distortion
@@ -456,17 +464,19 @@ class Figure(CompositeFigure):
         complete_transformation = transforms.Affine2D(
             matrix=np.array([[figure_width, 0, 0], [0, figure_width, 0], [0, 0, 1]])) + fig.dpi_scale_trans
         super().draw(fig, complete_axis, complete_transformation)
-        if self.figure_output_direct is None:
-            raise ValueError('No figure output direct')
-        elif output_svg:
-            save_path = '{}/{}.svg'.format(self.figure_output_direct, self.figure_name)
-            if background:
-                parameter_dict = {}
+        if save:
+            if self.figure_output_direct is None:
+                raise ValueError('No figure output direct')
+            elif output_svg:
+                save_path = '{}/{}.svg'.format(self.figure_output_direct, self.figure_name)
+                if background:
+                    parameter_dict = {}
+                else:
+                    parameter_dict = {'transparent': True}
             else:
-                parameter_dict = {'transparent': True}
-        else:
-            save_path = '{}/{}.pdf'.format(self.figure_output_direct, self.figure_name)
-            parameter_dict = {}
-        fig.savefig(save_path, dpi=fig.dpi, **parameter_dict)
+                save_path = '{}/{}.pdf'.format(self.figure_output_direct, self.figure_name)
+                parameter_dict = {}
+            fig.savefig(save_path, dpi=fig.dpi, **parameter_dict)
+        return fig
 
 

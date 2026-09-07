@@ -2,8 +2,7 @@ from .data_20251115_ad_sema import (
     DataSource, common_data_loader, model_loader, ModelList, common_model_constructor,
     Keywords, MFARunningMode, it, ModelKeyword,
     UserDefinedMFASettings as OldUserDefinedMFASettings, MFASettings,
-    result_process_information_dict_analysis, flux_process_map_func,
-    result_process_figure_config_dict_generator,
+    flux_process_map_func, result_process_figure_config_dict_generator,
     display_flux_name_dict as old_display_flux_name_dict,
     metabolic_network_parameter_generator, dataset_extractor,
 )
@@ -143,6 +142,74 @@ def return_result_label_model_data_config_dict(
     return returned_content
 
 
+def result_process_information_dict_analysis(complete_result_information_dict, target=Keywords.mid_prediction):
+    """单组织模型: 不同 model_tissue 对应不同 major_key，避免跨组织通量集合冲突。
+
+    flux_comparison 分支按 model_tissue 拆分 major_key（每个组织一张图），
+    组织内 ctrl/sema 各合并 6 例对比；mid_prediction 分支与基线保持一致。
+    """
+    from scripts.figures.common.config import ColorConfig
+
+    color_dict_without_index = {
+        keyword.ctrl: ColorConfig.normal_blue,
+        keyword.sema: ColorConfig.orange,
+    }
+    color_order_dict = {}
+    total_index = 0
+    each_group_replicate_num = 6
+    for condition_name, color in color_dict_without_index.items():
+        for current_index in range(1, 1 + each_group_replicate_num):
+            color_order_dict[(condition_name, current_index)] = (total_index + current_index, color)
+        total_index += each_group_replicate_num
+
+    return_parameter_list = []
+    if target == Keywords.mid_prediction:
+        for result_label, current_result_information_dict in complete_result_information_dict.items():
+            major_key = data_name
+            if len(current_result_information_dict) == 0:
+                continue
+            condition = current_result_information_dict[keyword.condition]
+            index = current_result_information_dict[keyword.index]
+            minor_key_list = []
+            minor_key_str = f'{condition}_{index}'
+            order_index, current_color = color_order_dict[(condition, index)]
+            return_parameter_list.append(
+                (result_label, major_key, minor_key_list, minor_key_str, current_color, order_index))
+    elif target == Keywords.flux_comparison:
+        index_range = tuple(range(1, each_group_replicate_num + 1))
+        # result_label = f'{data_result_label}__{model_tissue}'，按组织建立 (condition, index) → result_label
+        tissue_result_label_dict = {each_tissue: {} for each_tissue in model_tissue_list}
+        for result_label, current_result_information_dict in complete_result_information_dict.items():
+            if len(current_result_information_dict) == 0:
+                continue
+            _, _, model_tissue = result_label.rpartition('__')
+            if model_tissue not in tissue_result_label_dict:
+                continue
+            condition = current_result_information_dict[keyword.condition]
+            index = current_result_information_dict[keyword.index]
+            tissue_result_label_dict[model_tissue][(condition, index)] = result_label
+
+        # 每个 model_tissue 一个 major_key；组织内 ctrl/sema 合并对比
+        for major_key in model_tissue_list:
+            each_tissue_dict = tissue_result_label_dict[major_key]
+            if len(each_tissue_dict) == 0:
+                continue
+            for order_index, (condition, current_color) in enumerate(color_dict_without_index.items()):
+                result_label_list = tuple([
+                    each_tissue_dict[(condition, current_index)]
+                    for current_index in index_range
+                    if (condition, current_index) in each_tissue_dict])
+                if len(result_label_list) == 0:
+                    continue
+                minor_key_str = f'{condition}_{Keywords.combine}'
+                minor_key_list = []
+                return_parameter_list.append(
+                    (result_label_list, major_key, minor_key_list, minor_key_str, current_color, order_index))
+    else:
+        raise ValueError()
+    return return_parameter_list
+
+
 display_flux_name_dict = {
     **old_display_flux_name_dict,
     ('LAC_c_isf_exchange', 'LAC_c_isf_exchange__R'): 'LAC isf output net',
@@ -184,7 +251,7 @@ def tissue_mid_name_list_dict_constructor(current_experiment_name=model_name, **
 def tissue_flux_name_list_dict_constructor(current_model_name=model_name, **kwargs):
     """单组织模型重要 flux 展示: serum/liver/脑组织(糖酵解 + TCA + 神经递质交换)。"""
     flux_name_list_in_serum = [
-        ['GLYCOLYSIS_c', ('LDH_e', 'LDH_e__R')],
+        # ['GLYCOLYSIS_c', ('LDH_e', 'LDH_e__R')],
     ]
     flux_name_list_in_liver = [
         [('GLC_exchange', 'GLC_exchange__R'), ('FBA_c', 'FBA_c__R'), 'PYK_c', ('LDH_c', 'LDH_c__R'),

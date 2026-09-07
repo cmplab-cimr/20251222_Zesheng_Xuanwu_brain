@@ -96,7 +96,10 @@ def flux_comparison_generator(
             if len(color_list) == 0:
                 color_list.extend(current_ax_color_list)
             if row_index == row_num - 1:
-                x_tick_labels_list.append(current_x_tick_labels)
+                if len(current_x_tick_labels) == 0:
+                    x_tick_labels_list.append(Keywords.default)
+                else:
+                    x_tick_labels_list.append(current_x_tick_labels)
                 x_label_list.append(common_x_label)
             else:
                 x_tick_labels_list.append(None)

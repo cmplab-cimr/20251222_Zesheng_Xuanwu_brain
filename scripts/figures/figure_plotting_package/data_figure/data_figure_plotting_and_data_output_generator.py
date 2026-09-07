@@ -1,6 +1,6 @@
 from ..common.core_plotting_functions import heatmap_text_str_list_generator, \
     core_heatmap_plotting, axis_appearance_setting, core_scatter_plotting, core_single_ax_bar_plot, \
-    core_plot_violin_box_plot, core_line_plotting, core_error_bar_plotting, \
+    core_plot_violin_box_plot, core_line_plotting, core_fill_between_plotting, core_error_bar_plotting, \
     core_histogram_plotting, get_twin_axis_numeric_parameters, raw_cbar_plotting, core_cbar_plotting, \
     HeatmapValueFormat
 from ..common.common_functions import round_to_str_with_fixed_point, default_parameter_extract
@@ -158,8 +158,8 @@ def single_scatter_plotting(
         y_lim=None, y_ticks=None, cutoff_value=None, cutoff_param_dict=None, x_label=None,
         x_label_format_dict=None, x_tick_labels=None, x_tick_label_format_dict=None,
         y_label=None, y_label_format_dict=None, y_tick_labels=None, y_tick_label_format_dict=None,
-        error_bar=False, error_bar_param_dict=None, scatter_line=None, line_param_dict=None,
-        y_label_color=None, **kwargs):
+        error_bar=False, error_bar_param_dict=None, scatter_line=None,
+        line_param_dict=None, y_label_color=None, scatter_fill=None, **kwargs):
     if scatter_param_dict is None:
         scatter_param_dict = {}
     if error_bar_param_dict is None:
@@ -185,6 +185,18 @@ def single_scatter_plotting(
             cutoff_value=cutoff_value, cutoff_param_dict=cutoff_param_dict,)
     else:
         raise ValueError()
+
+    if scatter_fill is not None:
+        for x_value_list, y_value_list, *fill_param_dict in scatter_fill:
+            current_fill_param_dict = (
+                dict(fill_param_dict[0]) if fill_param_dict else {}
+            )
+            core_fill_between_plotting(
+                current_ax,
+                x_value_list,
+                y_value_list,
+                **current_fill_param_dict,
+            )
 
     if scatter_line is not None:
         if line_param_dict is None:
@@ -705,7 +717,9 @@ def draw_text_box(ax, ax_transform, center, width, height, angle=None, **kwargs)
     text_box_obj.set_clip_on(False)
 
 
-def draw_text_by_axis_loc(ax, text_content, text_axis_loc_pair, complete_ax_transform, **text_format_dict):
+def draw_text_by_axis_loc(
+        ax, text_content, text_axis_loc_pair, complete_ax_transform,
+        text_color_list=None, **text_format_dict):
     if text_content is None:
         return None
     text_format_dict = {
@@ -716,15 +730,28 @@ def draw_text_by_axis_loc(ax, text_content, text_axis_loc_pair, complete_ax_tran
     if isinstance(text_content, str):
         assert len(text_axis_loc_pair) == 2
         center = Vector(array=ax_axis_trans.transform(text_axis_loc_pair))
-        text_obj = draw_text(ax, center, text_content, **text_format_dict)
+        current_text_format_dict = dict(text_format_dict)
+        if text_color_list is not None:
+            current_text_format_dict[ParameterName.font_color] = text_color_list
+        text_obj = draw_text(ax, center, text_content, **current_text_format_dict)
     elif isinstance(text_content, (list, tuple)):
         assert (
                 isinstance(text_axis_loc_pair, (list, tuple, np.ndarray))
                 and len(text_content) == len(text_axis_loc_pair))
+        if text_color_list is None:
+            text_color_list = it.repeat(None)
+        else:
+            assert len(text_content) == len(text_color_list)
         text_obj = []
-        for current_text_content, current_text_axis_loc_pair in zip(text_content, text_axis_loc_pair):
+        for current_text_content, current_text_axis_loc_pair, current_text_color in zip(
+                text_content, text_axis_loc_pair, text_color_list):
             center = Vector(array=ax_axis_trans.transform(current_text_axis_loc_pair))
-            text_obj.append(draw_text(ax, center, current_text_content, **text_format_dict))
+            current_text_format_dict = dict(text_format_dict)
+            if current_text_color is not None:
+                current_text_format_dict[ParameterName.font_color] = current_text_color
+            text_obj.append(draw_text(
+                ax, center, current_text_content, **current_text_format_dict,
+            ))
     else:
         raise TypeError()
     return text_obj

@@ -923,6 +923,22 @@ def core_line_plotting(
     axis_numeric_setting(ax, x_lim=x_lim, x_ticks=x_ticks, y_lim=y_lim, y_ticks=y_ticks)
 
 
+def core_fill_between_plotting(
+        ax, x_value_array, y_value_array, baseline=0, face_color=None,
+        alpha=None, edge_width=0, z_order=None, **kwargs):
+    """Fill the area between a signal and a scalar baseline on a data axis."""
+    return ax.fill_between(
+        x_value_array,
+        baseline,
+        y_value_array,
+        facecolor=face_color,
+        edgecolor='none' if edge_width == 0 else face_color,
+        linewidth=edge_width,
+        alpha=alpha,
+        zorder=z_order,
+    )
+
+
 def core_error_bar_plotting(
         ax, x_value_array, y_value_array, y_error_bar_array=None, x_error_bar_array=None,
         edge_color=None, edge_width=None, cap_size=None, label=None, z_order=None, data_location_cap=False, **kwargs):

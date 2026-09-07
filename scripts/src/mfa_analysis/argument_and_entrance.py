@@ -1,5 +1,5 @@
 from ..inventory import ExperimentName, MFARunningMode, data_model_comment
-from ..common.packages import argparse
+import argparse
 
 
 def arg_setting(computation_subparsers, experimental_operation_label):

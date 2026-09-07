@@ -25,6 +25,11 @@ class BasicScatterDataFigure(DataFigure):
         ]]
         self.complete_scatter_line_list = default_parameter_extract(
             figure_data_parameter_dict, ParameterName.scatter_line, it.repeat(None))
+        self.complete_scatter_fill_list = default_parameter_extract(
+            figure_data_parameter_dict,
+            ParameterName.scatter_fill,
+            [None] * len(self.complete_data_dict_list),
+        )
 
         (
             axis_format_dict, axis_tick_format_dict,
@@ -68,6 +73,11 @@ class BasicScatterDataFigure(DataFigure):
                 ParameterName.supplementary_text_list,
                 ParameterName.supplementary_text_loc_list,
             ], None, repeat_default_value=True)
+        self.supplementary_text_color_list = default_parameter_extract(
+            figure_data_parameter_dict,
+            ParameterName.supplementary_text_color_list,
+            it.repeat(None),
+        )
 
         (
             self.cutoff_value_list,
@@ -122,16 +132,18 @@ class BasicScatterDataFigure(DataFigure):
         ax_and_transform_list = super().draw(fig, parent_ax, parent_transformation)
         for (
                 complete_data_dict, (current_ax, current_transform), x_lim, x_label, x_ticks, x_tick_labels, y_lim,
-                y_label, y_ticks, y_tick_labels, cutoff_value, scatter_line, y_label_color) in zip(
+                y_label, y_ticks, y_tick_labels, cutoff_value, scatter_line, scatter_fill,
+                y_label_color) in zip(
                 self.complete_data_dict_list, ax_and_transform_list, self.x_lim_list, self.x_label_list,
                 self.x_ticks_list, self.x_tick_labels_list, self.y_lim_list, self.y_label_list, self.y_ticks_list,
                 self.y_tick_labels_list, self.cutoff_value_list, self.complete_scatter_line_list,
-                self.y_label_color_list):
+                self.complete_scatter_fill_list, self.y_label_color_list):
             single_scatter_plotting(
                 current_ax, current_transform, complete_data_dict, x_lim=x_lim, x_ticks=x_ticks, x_label=x_label,
                 x_tick_labels=x_tick_labels, y_lim=y_lim, y_ticks=y_ticks,
                 y_label=y_label, y_tick_labels=y_tick_labels, cutoff_value=cutoff_value,
-                scatter_line=scatter_line, error_bar=self.error_bar, y_label_color=y_label_color,
+                scatter_line=scatter_line, scatter_fill=scatter_fill,
+                error_bar=self.error_bar, y_label_color=y_label_color,
                 **self.figure_config_dict)
         if self.subplot_name_list is not None:
             for subplot_name, (current_ax, current_transform) in zip(self.subplot_name_list, ax_and_transform_list):
@@ -139,10 +151,15 @@ class BasicScatterDataFigure(DataFigure):
                     current_ax, subplot_name, self.text_axis_loc_pair, current_transform,
                     **self.figure_config_dict[ParameterName.subplot_name_text_format_dict])
         if self.supplementary_text_list is not None:
-            for supplementary_text, supplementary_loc, (current_ax, current_transform) in zip(
-                    self.supplementary_text_list, self.supplementary_text_loc_list, ax_and_transform_list):
+            for (
+                    supplementary_text, supplementary_loc, supplementary_text_colors,
+                    (current_ax, current_transform),
+            ) in zip(
+                    self.supplementary_text_list, self.supplementary_text_loc_list,
+                    self.supplementary_text_color_list, ax_and_transform_list):
                 draw_text_by_axis_loc(
                     current_ax, supplementary_text, supplementary_loc, current_transform,
+                    text_color_list=supplementary_text_colors,
                     **self.figure_config_dict[ParameterName.supplementary_text_format_dict])
 
     def move_and_scale(self, scale=1, bottom_left_offset=None, base_z_order=0, z_order_increment=1):
@@ -162,6 +179,13 @@ class BasicScatterDataFigure(DataFigure):
                 for _, _, *detailed_line_param_dict in scatter_line:
                     if len(detailed_line_param_dict) > 0:
                         move_and_scale_for_dict(detailed_line_param_dict[0], scale=scale)
+        for scatter_fill in self.complete_scatter_fill_list:
+            if scatter_fill is not None:
+                for _, _, *detailed_fill_param_dict in scatter_fill:
+                    if len(detailed_fill_param_dict) > 0:
+                        move_and_scale_for_dict(
+                            detailed_fill_param_dict[0], scale=scale,
+                        )
         pass
 
 

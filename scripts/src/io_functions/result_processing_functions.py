@@ -963,8 +963,8 @@ def flux_comparison_plotting_func_template(
         else:
             raise ValueError()
 
-        final_flux_name_nested_list = []
-        tissue_specific_display_flux_dict = {}
+        each_major_key_final_flux_name_nested_list_dict = {}
+        each_major_key_tissue_specific_display_flux_dict = {}
         processed_result_dict = {}
         extra_group_key_name = ''
         tmp_organized_mouse_data_dict = {}
@@ -974,20 +974,23 @@ def flux_comparison_plotting_func_template(
         for (
                 result_label, major_key, minor_key_list, minor_key_str, current_color, order_index
         ) in result_process_information_dict_analysis(final_information_dict, target=Keywords.flux_comparison):
+            if major_key not in tmp_organized_mouse_data_dict:
+                tmp_organized_mouse_data_dict[major_key] = {}
+                tmp_color_dict[major_key] = {}
+                tmp_name_dict[major_key] = {}
+                each_major_key_tissue_specific_display_flux_dict[major_key] = {}
+                each_major_key_final_flux_name_nested_list_dict[major_key] = []
             if result_label in processed_result_dict:
                 processed_result = processed_result_dict[result_label]
             else:
                 processed_result = process_each_result_label(
                     buffer_dict, result_label, solution_array_dict, final_flux_name_index_dict, subset_index_dict,
                     all_tissue_flux_name_list_dict, display_flux_dict, display_tissue_dict,
-                    final_flux_name_nested_list, tissue_specific_display_flux_dict)
+                    each_major_key_final_flux_name_nested_list_dict[major_key],
+                    each_major_key_tissue_specific_display_flux_dict[major_key])
                 processed_result_dict[result_label] = processed_result
             (processed_flux_value_dict, ) = processed_result
 
-            if major_key not in tmp_organized_mouse_data_dict:
-                tmp_organized_mouse_data_dict[major_key] = {}
-                tmp_color_dict[major_key] = {}
-                tmp_name_dict[major_key] = {}
             tmp_color_dict[major_key][minor_key_str] = (order_index, current_color)
             tmp_name_dict[major_key][minor_key_str] = (order_index, minor_key_str)
             for flux_title, each_flux_data_array in processed_flux_value_dict.items():
@@ -1014,9 +1017,10 @@ def flux_comparison_plotting_func_template(
                         each_flux_data_dict[extra_group_key_name])}
             figure_plotting.distribution_comparison_plotting(
                 figure_output_direct=flux_comparison_output_direct, figure_name=f'flux_comparison_{major_key}',
-                complete_data_dict=current_organized_mouse_data_dict, flux_name_nested_list=final_flux_name_nested_list,
-                display_flux_dict=tissue_specific_display_flux_dict, name_dict=ordered_name_dict,
-                color_dict=ordered_color_dict, **figure_param_dict)
+                complete_data_dict=current_organized_mouse_data_dict,
+                flux_name_nested_list=each_major_key_final_flux_name_nested_list_dict[major_key],
+                display_flux_dict=each_major_key_tissue_specific_display_flux_dict[major_key],
+                name_dict=ordered_name_dict, color_dict=ordered_color_dict, **figure_param_dict)
             organized_mouse_data_dict[major_key] = current_organized_mouse_data_dict
 
         figure_raw_data = FigureData(FigureDataKeywords.flux_comparison, experiment_name)
